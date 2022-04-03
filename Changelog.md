@@ -14,6 +14,10 @@
 
 - [#541]: Deserialize specially named `$text` enum variant in [externally tagged]
   enums from textual content
+- [#379]: Improved compliance with the XML attribute value normalization process by
+  adding `Attribute::normalized_value()` and `Attribute::normalized_value_with()`,
+  which ought to be used in place of `Attribute::unescape_value()` and
+  `Attribute::unescape_value_with()`
 
 ### Bug Fixes
 
@@ -22,10 +26,15 @@
 
 ### Misc Changes
 
+### New Tests
+
+- [#379]: Added tests for attribute value normalization
+
 [externally tagged]: https://serde.rs/enum-representations.html#externally-tagged
 [#490]: https://github.com/tafia/quick-xml/pull/490
 [#537]: https://github.com/tafia/quick-xml/issues/537
 [#541]: https://github.com/tafia/quick-xml/pull/541
+[#379]: https://github.com/tafia/quick-xml/pull/379
 
 ## 0.27.1 -- 2022-12-28
 
