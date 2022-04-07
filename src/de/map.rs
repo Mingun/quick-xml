@@ -1,5 +1,7 @@
 //! Serde `Deserializer` module
 
+#[cfg(feature = "span")]
+use crate::events::Spanned;
 use crate::{
     de::key::QNameDeserializer,
     de::resolver::EntityResolver,
@@ -619,8 +621,12 @@ where
             match self.map.de.next()? {
                 // Handles <field>UnitEnumVariant</field>
                 DeEvent::Start(e) => {
+                    #[cfg(feature = "span")]
+                    let start = e.span().start;
+                    #[cfg(not(feature = "span"))]
+                    let start = 0;
                     // skip <field>, read text after it and ensure that it is ended by </field>
-                    let text = self.map.de.read_text(e.name())?;
+                    let text = self.map.de.read_text(e.name(), start)?;
                     if text.is_empty() {
                         // Map empty text (<field/>) to a special `$text` variant
                         visitor.visit_enum(SimpleTypeDeserializer::from_text(TEXT_KEY.into()))
@@ -1022,7 +1028,7 @@ where
     /// [`CData`]: crate::events::Event::CData
     #[inline]
     fn read_string(&mut self) -> Result<Cow<'de, str>, DeError> {
-        self.de.read_text(self.start.name())
+        self.de.read_text(self.start.name(), 0) // TODO: provide correct span information
     }
 }
 
