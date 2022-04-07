@@ -9,6 +9,9 @@ use quick_xml::events::{BytesDecl, BytesStart, BytesText, Event};
 use quick_xml::name::QName;
 use quick_xml::reader::Reader;
 
+mod helpers;
+use helpers::{read_event, read_event_into};
+
 /// Regression test for https://github.com/tafia/quick-xml/issues/94
 #[test]
 fn issue94() {
@@ -120,8 +123,8 @@ mod issue514 {
         let html_start = BytesStart::new("html");
         let html_end = html_start.to_end().into_owned();
 
-        assert_eq!(reader.read_event().unwrap(), Event::Start(outer_start));
-        assert_eq!(reader.read_event().unwrap(), Event::Start(html_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(outer_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(html_start));
 
         reader.config_mut().check_end_names = false;
 
@@ -129,8 +132,8 @@ mod issue514 {
 
         reader.config_mut().check_end_names = true;
 
-        assert_eq!(reader.read_event().unwrap(), Event::End(outer_end));
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::End(outer_end));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 
     /// Canary check that legitimate error is reported
@@ -143,8 +146,8 @@ mod issue514 {
         let html_start = BytesStart::new("html");
         let html_end = html_start.to_end().into_owned();
 
-        assert_eq!(reader.read_event().unwrap(), Event::Start(outer_start));
-        assert_eq!(reader.read_event().unwrap(), Event::Start(html_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(outer_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(html_start));
 
         reader.config_mut().check_end_names = false;
 
@@ -177,14 +180,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         match reader.read_event_into(&mut buf) {
             Err(Error::Syntax(SyntaxError::UnclosedComment)) => {}
             x => panic!("Expected `Err(Syntax(UnclosedComment))`, but got `{:?}`", x),
         }
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 
     #[test]
@@ -193,14 +196,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         match reader.read_event_into(&mut buf) {
             Err(Error::Syntax(SyntaxError::UnclosedComment)) => {}
             x => panic!("Expected `Err(Syntax(UnclosedComment))`, but got `{:?}`", x),
         }
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 
     /// According to the grammar, `>` is allowed just in start of comment.
@@ -211,14 +214,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Comment(BytesText::from_escaped(">"))
         );
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 
     /// According to the grammar, `->` is allowed just in start of comment.
@@ -229,14 +232,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Comment(BytesText::from_escaped("->"))
         );
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 }
 
@@ -247,7 +250,7 @@ fn issue622() {
     reader.config_mut().trim_text(true);
 
     assert_eq!(
-        reader.read_event().unwrap(),
+        read_event(&mut reader).unwrap(),
         Event::Text(BytesText::from_escaped(">"))
     );
     match reader.read_event() {

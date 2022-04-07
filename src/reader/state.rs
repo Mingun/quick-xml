@@ -8,6 +8,9 @@ use crate::events::{BytesCData, BytesDecl, BytesEnd, BytesStart, BytesText, Even
 use crate::reader::EncodingRef;
 use crate::reader::{is_whitespace, BangType, Config, ParseState};
 
+#[cfg(feature = "span")]
+use crate::events::Spanned;
+
 use memchr;
 
 /// A struct that holds a current reader state and a parser configuration.
@@ -62,7 +65,7 @@ impl ReaderState {
     ///
     /// [`Text`]: Event::Text
     /// [`Eof`]: Event::Eof
-    pub fn emit_text<'b>(&mut self, bytes: &'b [u8]) -> Result<Event<'b>> {
+    pub fn emit_text<'b>(&mut self, _start: usize, bytes: &'b [u8]) -> Result<Event<'b>> {
         let mut content = bytes;
 
         if self.config.trim_text_end {
@@ -77,13 +80,24 @@ impl ReaderState {
         if content.is_empty() {
             Ok(Event::Eof)
         } else {
-            Ok(Event::Text(BytesText::wrap(content, self.decoder())))
+            let event = BytesText::wrap(content, self.decoder());
+
+            // Represents text content without trimmed spaces
+            #[cfg(feature = "span")]
+            let event = event.with_span(_start.._start + content.len());
+
+            Ok(Event::Text(event))
         }
     }
 
     /// reads `BytesElement` starting with a `!`,
     /// return `Comment`, `CData` or `DocType` event
-    pub fn emit_bang<'b>(&mut self, bang_type: BangType, buf: &'b [u8]) -> Result<Event<'b>> {
+    pub fn emit_bang<'b>(
+        &mut self,
+        bang_type: BangType,
+        _start: usize,
+        buf: &'b [u8],
+    ) -> Result<Event<'b>> {
         let uncased_starts_with = |string: &[u8], prefix: &[u8]| {
             string.len() >= prefix.len() && string[..prefix.len()].eq_ignore_ascii_case(prefix)
         };
@@ -121,27 +135,37 @@ impl ReaderState {
                         haystack = &haystack[p + 1..];
                     }
                 }
-                Ok(Event::Comment(BytesText::wrap(
-                    // Cut of `!--` and `--` from start and end
-                    &buf[3..len - 2],
-                    self.decoder(),
-                )))
+
+                // Cut of `!--` and `--` from start and end
+                let event = BytesText::wrap(&buf[3..len - 2], self.decoder());
+
+                #[cfg(feature = "span")]
+                let event = event.with_span(_start - 1..self.offset);
+
+                Ok(Event::Comment(event))
             }
             BangType::CData if uncased_starts_with(buf, b"![CDATA[") => {
                 debug_assert!(buf.ends_with(b"]]"));
-                Ok(Event::CData(BytesCData::wrap(
-                    // Cut of `![CDATA[` and `]]` from start and end
-                    &buf[8..len - 2],
-                    self.decoder(),
-                )))
+
+                // Cut of `![CDATA[` and `]]` from start and end
+                let event = BytesCData::wrap(&buf[8..len - 2], self.decoder());
+
+                #[cfg(feature = "span")]
+                let event = event.with_span(_start - 1..self.offset);
+
+                Ok(Event::CData(event))
             }
             BangType::DocType if uncased_starts_with(buf, b"!DOCTYPE") => {
                 match buf[8..].iter().position(|&b| !is_whitespace(b)) {
-                    Some(start) => Ok(Event::DocType(BytesText::wrap(
+                    Some(start) => {
                         // Cut of `!DOCTYPE` and any number of spaces from start
-                        &buf[8 + start..],
-                        self.decoder(),
-                    ))),
+                        let event = BytesText::wrap(&buf[8 + start..], self.decoder());
+
+                        #[cfg(feature = "span")]
+                        let event = event.with_span(_start - 1..self.offset);
+
+                        Ok(Event::DocType(event))
+                    }
                     None => {
                         // Because we here, we at least read `<!DOCTYPE>` and offset after `>`.
                         // We want report error at place where name is expected - this is just
@@ -163,7 +187,7 @@ impl ReaderState {
 
     /// Wraps content of `buf` into the [`Event::End`] event. Does the check that
     /// end name matches the last opened start name if `self.config.check_end_names` is set.
-    pub fn emit_end<'b>(&mut self, buf: &'b [u8]) -> Result<Event<'b>> {
+    pub fn emit_end<'b>(&mut self, _start: usize, buf: &'b [u8]) -> Result<Event<'b>> {
         // Strip the `/` character. `content` contains data between `</` and `>`
         let content = &buf[1..];
         // XML standard permits whitespaces after the markup name in closing tags.
@@ -212,14 +236,19 @@ impl ReaderState {
             }
         }
 
-        Ok(Event::End(BytesEnd::wrap(name.into())))
+        let event = BytesEnd::wrap(name.into());
+
+        #[cfg(feature = "span")]
+        let event = event.with_span(_start..self.offset);
+
+        Ok(Event::End(event))
     }
 
     /// `buf` contains data between `<` and `>` and the first byte is `?`.
     /// `self.offset` already after the `>`
     ///
     /// Returns `Decl` or `PI` event
-    pub fn emit_question_mark<'b>(&mut self, buf: &'b [u8]) -> Result<Event<'b>> {
+    pub fn emit_question_mark<'b>(&mut self, _start: usize, buf: &'b [u8]) -> Result<Event<'b>> {
         debug_assert!(buf.len() > 0);
         debug_assert_eq!(buf[0], b'?');
 
@@ -234,6 +263,9 @@ impl ReaderState {
             if content.starts_with(b"xml") && (len == 3 || is_whitespace(content[3])) {
                 let event = BytesDecl::from_start(BytesStart::wrap(content, 3));
 
+                #[cfg(feature = "span")]
+                let event = event.with_span(_start..self.offset);
+
                 // Try getting encoding from the declaration event
                 #[cfg(feature = "encoding")]
                 if self.encoding.can_be_refined() {
@@ -244,7 +276,12 @@ impl ReaderState {
 
                 Ok(Event::Decl(event))
             } else {
-                Ok(Event::PI(BytesText::wrap(content, self.decoder())))
+                let event = BytesText::wrap(content, self.decoder());
+
+                #[cfg(feature = "span")]
+                let event = event.with_span(_start..self.offset);
+
+                Ok(Event::PI(event))
             }
         } else {
             // <?....EOF
@@ -259,7 +296,7 @@ impl ReaderState {
     ///
     /// # Parameters
     /// - `content`: Content of a tag between `<` and `>`
-    pub fn emit_start<'b>(&mut self, content: &'b [u8]) -> Result<Event<'b>> {
+    pub fn emit_start<'b>(&mut self, start: usize, content: &'b [u8]) -> Result<Event<'b>> {
         let len = content.len();
         let name_end = content
             .iter()
@@ -270,8 +307,11 @@ impl ReaderState {
             let name_len = if name_end < len { name_end } else { len - 1 };
             let event = BytesStart::wrap(&content[..len - 1], name_len);
 
+            #[cfg(feature = "span")]
+            let event = event.with_span(start..self.offset);
+
             if self.config.expand_empty_elements {
-                self.state = ParseState::Empty;
+                self.state = ParseState::Empty(start);
                 self.opened_starts.push(self.opened_buffer.len());
                 self.opened_buffer.extend(&content[..name_len]);
                 Ok(Event::Start(event))
@@ -284,17 +324,29 @@ impl ReaderState {
             // enabled, we should have that information
             self.opened_starts.push(self.opened_buffer.len());
             self.opened_buffer.extend(&content[..name_end]);
-            Ok(Event::Start(BytesStart::wrap(content, name_end)))
+            let event = BytesStart::wrap(content, name_end);
+
+            // Represents `<tag-name ...attributes...>`, including `<` and `>`
+            #[cfg(feature = "span")]
+            let event = event.with_span(start..self.offset);
+
+            Ok(Event::Start(event))
         }
     }
 
     #[inline]
-    pub fn close_expanded_empty(&mut self) -> Result<Event<'static>> {
+    pub fn close_expanded_empty(&mut self, _start: usize) -> Result<Event<'static>> {
         self.state = ParseState::ClosedTag;
         let name = self
             .opened_buffer
             .split_off(self.opened_starts.pop().unwrap());
-        Ok(Event::End(BytesEnd::wrap(name.into())))
+        let event = BytesEnd::wrap(name.into());
+
+        // `offset` unchanged since emitting `Start` event
+        #[cfg(feature = "span")]
+        let event = event.with_span(_start..self.offset);
+
+        Ok(Event::End(event))
     }
 
     /// Get the decoder, used to decode bytes, read by this reader, to the strings.
