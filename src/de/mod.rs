@@ -2657,6 +2657,12 @@ where
     depth: usize,
     /// Maximum allowed recursion depth. Defaults to 128.
     max_depth: usize,
+
+    /// Span of the last emitted event. Spans does not included in events itself
+    /// to reduce size of the event structure and because spans usually not
+    /// needed by most software.
+    #[cfg(feature = "span")]
+    last_span: Option<Span>,
 }
 
 impl<'de, R, E> Deserializer<'de, R, E>
@@ -2689,6 +2695,9 @@ where
 
             depth: 0,
             max_depth: 128,
+
+            #[cfg(feature = "span")]
+            last_span: None,
         }
     }
 
@@ -3053,10 +3062,18 @@ where
     fn read_string_impl(&mut self, allow_start: bool) -> Result<Cow<'de, str>, DeError> {
         match self.next()? {
             // Reached by doc tests only: this file, lines 979 and 996
-            DeEvent::Text(e) => Ok(e.text),
-            // allow one nested level
+            DeEvent::Text(e) => {
+                #[cfg(feature = "span")]
+                {
+                    self.last_span = Some(e.span());
+                }
+                Ok(e.text)
+            }
             // Reached by trivial::{...}::{field, field_nested, field_tag_after, field_tag_before, nested, tag_after, tag_before, wrapped}
-            DeEvent::Start(e) if allow_start => self.read_text(e.name()),
+            #[cfg(feature = "span")]
+            DeEvent::Start(e) if allow_start => self.read_text(e.name(), e.span().start),
+            #[cfg(not(feature = "span"))]
+            DeEvent::Start(e) if allow_start => self.read_text(e.name(), 0),
             // TODO: not reached by any tests
             DeEvent::Start(e) => Err(DeError::MixedContent(e.name().as_ref().to_owned())),
             // SAFETY: The reader is guaranteed that we don't have unmatched tags
@@ -3072,12 +3089,18 @@ where
     /// # Parameters
     /// - `name`: name of a tag opened before reading text. The corresponding end tag
     ///   should present in input just after the text
-    fn read_text(&mut self, name: QName) -> Result<Cow<'de, str>, DeError> {
+    fn read_text(&mut self, name: QName, _start: u64) -> Result<Cow<'de, str>, DeError> {
         match self.next()? {
             DeEvent::Text(e) => match self.next()? {
                 // The matching tag name is guaranteed by the reader
                 // Reached by trivial::{...}::{field, wrapped}
-                DeEvent::End(_) => Ok(e.text),
+                DeEvent::End(_) => {
+                    #[cfg(feature = "span")]
+                    {
+                        self.last_span = Some(_start..self.location());
+                    }
+                    Ok(e.text)
+                }
                 // SAFETY: Cannot be two consequent Text events, they would be merged into one
                 DeEvent::Text(_) => unreachable!(),
                 // Reached by trivial::{...}::{field_tag_after, tag_after}
@@ -3089,7 +3112,13 @@ where
             // Return empty text in that case
             // The matching tag name is guaranteed by the reader
             // Reached by {...}::xs_list::empty
-            DeEvent::End(_) => Ok("".into()),
+            DeEvent::End(_) => {
+                #[cfg(feature = "span")]
+                {
+                    self.last_span = Some(_start..self.location());
+                }
+                Ok("".into())
+            }
             // Reached by trivial::{...}::{field_nested, field_tag_before, nested, tag_before}
             DeEvent::Start(s) => Err(DeError::MixedContent(s.name().as_ref().to_owned())),
             // Reached by struct_::non_closed::elements_child
@@ -3229,6 +3258,11 @@ where
             }
             _ => true,
         })
+    }
+
+    #[cfg(feature = "span")]
+    fn location(&self) -> u64 {
+        self.reader.reader.location()
     }
 
     /// Method for testing Deserializer implementation. Checks that all events was consumed during
@@ -3471,7 +3505,18 @@ where
         // When document is pretty-printed there could be whitespaces before the root element
         self.skip_whitespaces()?;
         match self.next()? {
-            DeEvent::Start(e) => visitor.visit_map(ElementMapAccess::new(self, e, fields)?),
+            DeEvent::Start(e) => {
+                #[cfg(feature = "span")]
+                let start = e.span().start;
+
+                let value = visitor.visit_map(ElementMapAccess::new(self, e, fields)?)?;
+
+                #[cfg(feature = "span")]
+                {
+                    self.last_span = Some(start..self.location());
+                }
+                Ok(value)
+            }
             // SAFETY: The reader is guaranteed that we don't have unmatched tags
             // If we here, then our deserializer has a bug
             DeEvent::End(e) => unreachable!("{:?}", e),
@@ -3669,6 +3714,9 @@ pub trait XmlRead<'i> {
 
     /// Return an XML version of the source.
     fn xml_version(&self) -> XmlVersion;
+
+    /// Returns current offset in bytes in the input data
+    fn location(&self) -> u64;
 }
 
 /// XML input source that reads from a std::io input stream.
@@ -3742,6 +3790,11 @@ impl<'i, R: BufRead> XmlRead<'i> for IoReader<R> {
     fn xml_version(&self) -> XmlVersion {
         self.version
     }
+
+    #[inline]
+    fn location(&self) -> u64 {
+        self.reader.buffer_position()
+    }
 }
 
 /// XML input source that reads from a slice of bytes and can borrow from it.
@@ -3810,6 +3863,11 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
     #[inline]
     fn xml_version(&self) -> XmlVersion {
         self.version
+    }
+
+    #[inline]
+    fn location(&self) -> u64 {
+        self.reader.buffer_position()
     }
 }
 
