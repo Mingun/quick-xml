@@ -11,6 +11,9 @@ use quick_xml::events::{
 };
 use quick_xml::reader::Reader;
 
+mod helpers;
+use helpers::read_event;
+
 mod allow_dangling_amp {
     use super::*;
     use pretty_assertions::assert_eq;
@@ -58,19 +61,19 @@ mod allow_dangling_amp {
         reader.config_mut().allow_dangling_amp = true;
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped("&"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped("&"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::GeneralRef(BytesRef::new("lt"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped("&"))
         );
         assert_eq!(reader.read_event().unwrap(), Event::Eof);
@@ -87,11 +90,11 @@ mod allow_unmatched_ends {
         reader.config_mut().allow_unmatched_ends = false;
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::new("tag"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("tag"))
         );
         match reader.read_event() {
@@ -109,16 +112,16 @@ mod allow_unmatched_ends {
         reader.config_mut().allow_unmatched_ends = true;
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::new("tag"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("tag"))
         );
         // #770: We want to allow this
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("unmatched"))
         );
         assert_eq!(reader.read_event().unwrap(), Event::Eof);
@@ -138,14 +141,14 @@ mod check_comments {
             reader.config_mut().check_comments = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new("").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -154,14 +157,14 @@ mod check_comments {
             reader.config_mut().check_comments = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new(" comment ").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -170,14 +173,14 @@ mod check_comments {
             reader.config_mut().check_comments = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new(" comment -- ").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -186,14 +189,14 @@ mod check_comments {
             reader.config_mut().check_comments = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new(" comment -").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -202,14 +205,14 @@ mod check_comments {
             reader.config_mut().check_comments = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new(">").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -218,14 +221,14 @@ mod check_comments {
             reader.config_mut().check_comments = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new("->").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
     }
 
@@ -248,14 +251,14 @@ mod check_comments {
             reader.config_mut().check_comments = true;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new("").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -264,14 +267,14 @@ mod check_comments {
             reader.config_mut().check_comments = true;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new(" comment ").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -287,10 +290,10 @@ mod check_comments {
             }
             // #513: We want to continue parsing after the error
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -306,10 +309,10 @@ mod check_comments {
             }
             // #513: We want to continue parsing after the error
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -318,14 +321,14 @@ mod check_comments {
             reader.config_mut().check_comments = true;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new(">").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -334,14 +337,14 @@ mod check_comments {
             reader.config_mut().check_comments = true;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new("->").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
     }
 }
@@ -359,22 +362,22 @@ mod check_end_names {
             reader.config_mut().check_end_names = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -383,22 +386,22 @@ mod check_end_names {
             reader.config_mut().check_end_names = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("mismatched"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
     }
 
@@ -412,22 +415,22 @@ mod check_end_names {
             reader.config_mut().check_end_names = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -436,11 +439,11 @@ mod check_end_names {
             reader.config_mut().check_end_names = true;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("tag"))
             );
             match reader.read_event() {
@@ -455,10 +458,10 @@ mod check_end_names {
             }
             // #513: We want to continue parsing after the error
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("tag"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
     }
 }
@@ -474,10 +477,10 @@ mod expand_empty_elements {
         reader.config_mut().expand_empty_elements = false;
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Empty(BytesStart::new("root"))
         );
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 
     /// Self-closed elements should be reported as two events
@@ -487,14 +490,14 @@ mod expand_empty_elements {
         reader.config_mut().expand_empty_elements = true;
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::new("root"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("root"))
         );
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 }
 
@@ -514,14 +517,14 @@ mod trim_markup_names_in_closing_tags {
             reader.config_mut().check_end_names = false;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("root"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("root \t\r\n"))
             );
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
 
         #[test]
@@ -531,7 +534,7 @@ mod trim_markup_names_in_closing_tags {
             reader.config_mut().check_end_names = true;
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("root"))
             );
             match reader.read_event() {
@@ -544,7 +547,7 @@ mod trim_markup_names_in_closing_tags {
                 ),
                 x => panic!("Expected `Err(IllFormed(_))`, but got `{:?}`", x),
             }
-            assert_eq!(reader.read_event().unwrap(), Event::Eof);
+            assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
         }
     }
 
@@ -554,14 +557,14 @@ mod trim_markup_names_in_closing_tags {
         reader.config_mut().trim_markup_names_in_closing_tags = true;
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::new("root"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("root"))
         );
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 }
 
@@ -593,74 +596,74 @@ mod trim_text {
         assert_eq!(reader.config().trim_text_end, false);
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\n"))
         );
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::DocType(BytesText::from_escaped("root \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\n"))
         );
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::from_content("root \t\r\n", 4))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\n"))
         );
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Empty(BytesStart::from_content("empty \t\r\n", 5))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\ntext \t\r\n"))
         );
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Comment(BytesComment::new(" comment \t\r\n").unwrap())
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\n"))
         );
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::CData(BytesCData::new(" \t\r\ncdata \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\n"))
         );
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::PI(BytesPI::new("pi \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\n"))
         );
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("root"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\n"))
         );
 
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 
     // NOTE: Documents CURRENT behavior, which is not spec-correct (see
@@ -681,38 +684,38 @@ mod trim_text {
         assert_eq!(reader.config().trim_text_end, true);
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::DocType(BytesText::from_escaped("root \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::from_content("root \t\r\n", 4))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Empty(BytesStart::from_content("empty \t\r\n", 5))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::new("text"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Comment(BytesComment::new(" comment \t\r\n").unwrap())
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::CData(BytesCData::new(" \t\r\ncdata \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::PI(BytesPI::new("pi \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("root"))
         );
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 
     // NOTE: Documents CURRENT (spec-incorrect) behavior, same divergences as
@@ -727,38 +730,38 @@ mod trim_text {
         assert_eq!(reader.config().trim_text_end, false);
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::DocType(BytesText::from_escaped("root \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::from_content("root \t\r\n", 4))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Empty(BytesStart::from_content("empty \t\r\n", 5))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped("text \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Comment(BytesComment::new(" comment \t\r\n").unwrap())
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::CData(BytesCData::new(" \t\r\ncdata \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::PI(BytesPI::new("pi \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("root"))
         );
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 
     // TODO: Enable test after rewriting parser
@@ -774,38 +777,38 @@ mod trim_text {
         assert_eq!(reader.config().trim_text_start, false);
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::DocType(BytesText::from_escaped("root \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Start(BytesStart::from_content("root \t\r\n", 4))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Empty(BytesStart::from_content("empty \t\r\n", 5))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Text(BytesText::from_escaped(" \t\r\ntext"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::Comment(BytesComment::new(" comment \t\r\n").unwrap())
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::CData(BytesCData::new(" \t\r\ncdata \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::PI(BytesPI::new("pi \t\r\n"))
         );
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Event::End(BytesEnd::new("root"))
         );
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 
     // trim_text should only suppress whitespace-only text nodes that represent
@@ -830,23 +833,23 @@ mod trim_text {
             reader.config_mut().trim_text(true);
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("root"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped(" "))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::GeneralRef(BytesRef::new("amp"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped(" "))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("root"))
             );
             assert_eq!(reader.read_event().unwrap(), Event::Eof);
@@ -862,23 +865,23 @@ mod trim_text {
             reader.config_mut().trim_text(true);
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("root"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped("text "))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Comment(BytesComment::new(" comment ").unwrap())
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped(" more"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("root"))
             );
             assert_eq!(reader.read_event().unwrap(), Event::Eof);
@@ -892,23 +895,23 @@ mod trim_text {
             reader.config_mut().trim_text(true);
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("root"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped("text "))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::PI(BytesPI::new("pi target"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped(" more"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("root"))
             );
             assert_eq!(reader.read_event().unwrap(), Event::Eof);
@@ -922,23 +925,23 @@ mod trim_text {
             reader.config_mut().trim_text(true);
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("root"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped("text "))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::CData(BytesCData::new("data"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Text(BytesText::from_escaped(" more"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("root"))
             );
             assert_eq!(reader.read_event().unwrap(), Event::Eof);
@@ -952,15 +955,15 @@ mod trim_text {
             reader.config_mut().trim_text(true);
 
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Start(BytesStart::new("root"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::Empty(BytesStart::new("child"))
             );
             assert_eq!(
-                reader.read_event().unwrap(),
+                read_event(&mut reader).unwrap(),
                 Event::End(BytesEnd::new("root"))
             );
             assert_eq!(reader.read_event().unwrap(), Event::Eof);

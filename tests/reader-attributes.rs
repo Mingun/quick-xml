@@ -7,6 +7,9 @@ use quick_xml::reader::Reader;
 
 use pretty_assertions::assert_eq;
 
+mod helpers;
+use helpers::read_event;
+
 #[test]
 fn single_gt() {
     let mut reader = Reader::from_str("<a attr='>' check='2'></a>");
@@ -31,7 +34,7 @@ fn single_gt() {
         }
         x => panic!("expected <a attr='>'>, got {:?}", x),
     }
-    assert_eq!(reader.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut reader).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
@@ -58,7 +61,7 @@ fn single_gt_quot() {
         }
         x => panic!("expected <a attr='>'>, got {:?}", x),
     }
-    assert_eq!(reader.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut reader).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
@@ -85,7 +88,7 @@ fn double_gt() {
         }
         x => panic!("expected <a attr='>'>, got {:?}", x),
     }
-    assert_eq!(reader.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut reader).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
@@ -112,7 +115,7 @@ fn double_gt_apos() {
         }
         x => panic!("expected <a attr='>'>, got {:?}", x),
     }
-    assert_eq!(reader.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut reader).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]

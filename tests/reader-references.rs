@@ -6,6 +6,9 @@ use quick_xml::reader::Reader;
 
 use pretty_assertions::assert_eq;
 
+mod helpers;
+use helpers::read_event;
+
 mod character_reference {
     use super::*;
 
@@ -20,7 +23,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Decl(BytesDecl::new(&format!("&{i};"), None, None)),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -34,7 +37,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     PI(BytesPI::new(&format!("&{i};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -48,7 +51,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     DocType(BytesText::from_escaped(&format!("&{i};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -62,7 +65,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Comment(BytesComment::new(&format!("&{i};")).unwrap()),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -76,7 +79,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     CData(BytesCData::new(format!("&{i};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -90,7 +93,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     GeneralRef(BytesRef::new(format!("{i}"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -105,7 +108,7 @@ mod character_reference {
 
                 let name_len = format!("&{i};").len();
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Empty(BytesStart::from_content(
                         format!("&{i}; &{i};='&{i};' &{i};=\"&{i};\" &{i};=&{i};"),
                         name_len
@@ -123,7 +126,7 @@ mod character_reference {
 
                 let name_len = format!("&{i};").len();
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Start(BytesStart::from_content(
                         format!("&{i}; &{i};='&{i};' &{i};=\"&{i};\" &{i};=&{i};"),
                         name_len
@@ -143,7 +146,7 @@ mod character_reference {
                 // Skip <>
                 reader.read_event().unwrap();
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     End(BytesEnd::new(format!("&{i};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -162,7 +165,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Decl(BytesDecl::new(&format!("&#{i:x};"), None, None)),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -176,7 +179,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     PI(BytesPI::new(&format!("&#{i:x};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -190,7 +193,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     DocType(BytesText::from_escaped(&format!("&#{i:x};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -204,7 +207,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Comment(BytesComment::new(&format!("&#{i:x};")).unwrap()),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -218,7 +221,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     CData(BytesCData::new(format!("&#{i:x};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -232,7 +235,7 @@ mod character_reference {
                 let mut reader = Reader::from_str(&input);
 
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     GeneralRef(BytesRef::new(format!("#{i:x}"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -249,7 +252,7 @@ mod character_reference {
 
                 let name_len = format!("&#{i:x};").len();
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Empty(BytesStart::from_content(
                         format!(
                             "&#{i:x}; &#{i:x};='&#{i:x};' &#{i:x};=\"&#{i:x};\" &#{i:x};=&#{i:x};"
@@ -271,7 +274,7 @@ mod character_reference {
 
                 let name_len = format!("&#{i:x};").len();
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Start(BytesStart::from_content(
                         format!(
                             "&#{i:x}; &#{i:x};='&#{i:x};' &#{i:x};=\"&#{i:x};\" &#{i:x};=&#{i:x};"
@@ -293,7 +296,7 @@ mod character_reference {
                 // Skip <>
                 reader.read_event().unwrap();
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     End(BytesEnd::new(format!("&#{i:x};"))),
                     "Character reference {i}=0x{i:x}: {input}"
                 );
@@ -311,7 +314,7 @@ mod general_entity_reference {
         let mut reader = Reader::from_str("<?xml version=\"&entity;\"?>");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Decl(BytesDecl::new("&entity;", None, None)),
         );
     }
@@ -320,7 +323,10 @@ mod general_entity_reference {
     fn pi() {
         let mut reader = Reader::from_str("<?&entity;?>");
 
-        assert_eq!(reader.read_event().unwrap(), PI(BytesPI::new("&entity;")));
+        assert_eq!(
+            read_event(&mut reader).unwrap(),
+            PI(BytesPI::new("&entity;"))
+        );
     }
 
     #[test]
@@ -328,7 +334,7 @@ mod general_entity_reference {
         let mut reader = Reader::from_str("<!DOCTYPE &entity;>");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             DocType(BytesText::from_escaped("&entity;")),
         );
     }
@@ -338,7 +344,7 @@ mod general_entity_reference {
         let mut reader = Reader::from_str("<!--&entity;-->");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Comment(BytesComment::new("&entity;").unwrap()),
         );
     }
@@ -348,7 +354,7 @@ mod general_entity_reference {
         let mut reader = Reader::from_str("<![CDATA[&entity;]]>");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             CData(BytesCData::new("&entity;")),
         );
     }
@@ -358,7 +364,7 @@ mod general_entity_reference {
         let mut reader = Reader::from_str("&entity;");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             GeneralRef(BytesRef::new("entity")),
         );
     }
@@ -371,7 +377,7 @@ mod general_entity_reference {
 
         let name_len = "&entity;".len();
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Empty(BytesStart::from_content(
                 "&entity; &entity;='&entity;' &entity;=\"&entity;\" &entity;=&entity;",
                 name_len
@@ -387,7 +393,7 @@ mod general_entity_reference {
 
         let name_len = "&entity;".len();
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Start(BytesStart::from_content(
                 "&entity; &entity;='&entity;' &entity;=\"&entity;\" &entity;=&entity;",
                 name_len
@@ -402,7 +408,10 @@ mod general_entity_reference {
 
         // Skip <>
         reader.read_event().unwrap();
-        assert_eq!(reader.read_event().unwrap(), End(BytesEnd::new("&entity;")));
+        assert_eq!(
+            read_event(&mut reader).unwrap(),
+            End(BytesEnd::new("&entity;"))
+        );
     }
 }
 
@@ -426,7 +435,7 @@ mod parameter_entity_reference {
         let mut reader = Reader::from_str("<?xml version=\"%param;\"?>");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Decl(BytesDecl::new("%param;", None, None)),
         );
     }
@@ -435,7 +444,10 @@ mod parameter_entity_reference {
     fn pi() {
         let mut reader = Reader::from_str("<?%param;?>");
 
-        assert_eq!(reader.read_event().unwrap(), PI(BytesPI::new("%param;")));
+        assert_eq!(
+            read_event(&mut reader).unwrap(),
+            PI(BytesPI::new("%param;"))
+        );
     }
 
     /// Because we do not parse DTD, we do not recognize parameter reference here yet.
@@ -445,7 +457,7 @@ mod parameter_entity_reference {
         let mut reader = Reader::from_str("<!DOCTYPE %param;>");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             DocType(BytesText::from_escaped("%param;")),
         );
     }
@@ -458,7 +470,7 @@ mod parameter_entity_reference {
         let mut reader = Reader::from_str("<!--%param;-->");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Comment(BytesComment::new("%param;").unwrap()),
         );
     }
@@ -468,7 +480,7 @@ mod parameter_entity_reference {
         let mut reader = Reader::from_str("<![CDATA[%param;]]>");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             CData(BytesCData::new("%param;")),
         );
     }
@@ -478,7 +490,7 @@ mod parameter_entity_reference {
         let mut reader = Reader::from_str("%param;");
 
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Text(BytesText::from_escaped("%param;")),
         );
     }
@@ -490,7 +502,7 @@ mod parameter_entity_reference {
 
         let name_len = "%param;".len();
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Empty(BytesStart::from_content(
                 "%param; %param;='%param;' %param;=\"%param;\" %param;=%param;",
                 name_len
@@ -505,7 +517,7 @@ mod parameter_entity_reference {
 
         let name_len = "%param;".len();
         assert_eq!(
-            reader.read_event().unwrap(),
+            read_event(&mut reader).unwrap(),
             Start(BytesStart::from_content(
                 "%param; %param;='%param;' %param;=\"%param;\" %param;=%param;",
                 name_len
@@ -520,7 +532,10 @@ mod parameter_entity_reference {
 
         // Skip <>
         reader.read_event().unwrap();
-        assert_eq!(reader.read_event().unwrap(), End(BytesEnd::new("%param;")));
+        assert_eq!(
+            read_event(&mut reader).unwrap(),
+            End(BytesEnd::new("%param;"))
+        );
     }
 }
 
@@ -530,18 +545,33 @@ fn mixed_text() {
     let mut r = Reader::from_str(input);
 
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Text(BytesText::from_escaped("text with "))
     );
-    assert_eq!(r.read_event().unwrap(), GeneralRef(BytesRef::new("lt")));
-    assert_eq!(r.read_event().unwrap(), GeneralRef(BytesRef::new("amp")));
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::from_escaped("'")));
-    assert_eq!(r.read_event().unwrap(), GeneralRef(BytesRef::new("#32")));
+    assert_eq!(read_event(&mut r).unwrap(), GeneralRef(BytesRef::new("lt")));
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
+        GeneralRef(BytesRef::new("amp"))
+    );
+    assert_eq!(
+        read_event(&mut r).unwrap(),
+        Text(BytesText::from_escaped("'"))
+    );
+    assert_eq!(
+        read_event(&mut r).unwrap(),
+        GeneralRef(BytesRef::new("#32"))
+    );
+    assert_eq!(
+        read_event(&mut r).unwrap(),
         Text(BytesText::from_escaped("' or '"))
     );
-    assert_eq!(r.read_event().unwrap(), GeneralRef(BytesRef::new("#x20")));
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::from_escaped("'")));
-    assert_eq!(r.read_event().unwrap(), Eof);
+    assert_eq!(
+        read_event(&mut r).unwrap(),
+        GeneralRef(BytesRef::new("#x20"))
+    );
+    assert_eq!(
+        read_event(&mut r).unwrap(),
+        Text(BytesText::from_escaped("'"))
+    );
+    assert_eq!(read_event(&mut r).unwrap(), Eof);
 }

@@ -303,6 +303,8 @@ impl<R: BufRead> NsReader<R> {
     ///
     /// ```
     /// # use pretty_assertions::assert_eq;
+    /// # #[cfg(feature = "span")]
+    /// # use quick_xml::events::Spanned;
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::name::{Namespace, ResolveResult};
     /// use quick_xml::reader::NsReader;
@@ -327,6 +329,9 @@ impl<R: BufRead> NsReader<R> {
     /// let ns = Namespace("namespace 1");
     /// let start = BytesStart::from_content(r#"outer xmlns="namespace 1""#, 5);
     /// let end   = start.to_end().into_owned();
+    ///
+    /// # #[cfg(feature = "span")]
+    /// # let start = start.with_span(5..32);
     ///
     /// // First, we read a start event...
     /// assert_eq!(
@@ -625,6 +630,8 @@ impl<'i> NsReader<&'i [u8]> {
     ///
     /// ```
     /// # use pretty_assertions::assert_eq;
+    /// # #[cfg(feature = "span")]
+    /// # use quick_xml::events::Spanned;
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::name::{Namespace, ResolveResult};
     /// use quick_xml::reader::NsReader;
@@ -648,6 +655,9 @@ impl<'i> NsReader<&'i [u8]> {
     /// let ns = Namespace("namespace 1");
     /// let start = BytesStart::from_content(r#"outer xmlns="namespace 1""#, 5);
     /// let end   = start.to_end().into_owned();
+    ///
+    /// # #[cfg(feature = "span")]
+    /// # let start = start.with_span(5..32);
     ///
     /// // First, we read a start event...
     /// assert_eq!(
@@ -709,6 +719,8 @@ impl<'i> NsReader<&'i [u8]> {
     /// ```
     /// # use pretty_assertions::assert_eq;
     /// # use std::borrow::Cow;
+    /// # #[cfg(feature = "span")]
+    /// # use quick_xml::events::Spanned;
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::NsReader;
     ///
@@ -723,6 +735,9 @@ impl<'i> NsReader<&'i [u8]> {
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
+    ///
+    /// # #[cfg(feature = "span")]
+    /// # let start = start.with_span(5..11);
     ///
     /// // First, we read a start event...
     /// assert_eq!(reader.read_event().unwrap(), Event::Start(start));

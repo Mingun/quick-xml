@@ -6,8 +6,11 @@ use quick_xml::events::{
 };
 use quick_xml::reader::{NsReader, Reader};
 
-// For event_ok and syntax_err macros
 mod helpers;
+use helpers::{
+    read_event, read_event_into, read_event_into_async, read_resolved_event,
+    read_resolved_event_into, read_resolved_event_into_async,
+};
 
 mod syntax {
     use super::*;
@@ -34,10 +37,13 @@ mod syntax {
             fn borrowed() {
                 let mut reader = Reader::from_str("<></>");
                 assert_eq!(
-                    reader.read_event().unwrap(),
+                    read_event(&mut reader).unwrap(),
                     Event::Start(BytesStart::new(""))
                 );
-                assert_eq!(reader.read_event().unwrap(), Event::End(BytesEnd::new("")));
+                assert_eq!(
+                    read_event(&mut reader).unwrap(),
+                    Event::End(BytesEnd::new(""))
+                );
             }
 
             #[test]
@@ -45,11 +51,11 @@ mod syntax {
                 let mut buf = Vec::new();
                 let mut reader = Reader::from_str("<></>");
                 assert_eq!(
-                    reader.read_event_into(&mut buf).unwrap(),
+                    read_event_into(&mut reader, &mut buf).unwrap(),
                     Event::Start(BytesStart::new(""))
                 );
                 assert_eq!(
-                    reader.read_event_into(&mut buf).unwrap(),
+                    read_event_into(&mut reader, &mut buf).unwrap(),
                     Event::End(BytesEnd::new(""))
                 );
             }
@@ -60,11 +66,11 @@ mod syntax {
                 let mut buf = Vec::new();
                 let mut reader = Reader::from_str("<></>");
                 assert_eq!(
-                    reader.read_event_into_async(&mut buf).await.unwrap(),
+                    read_event_into_async(&mut reader, &mut buf).await.unwrap(),
                     Event::Start(BytesStart::new(""))
                 );
                 assert_eq!(
-                    reader.read_event_into_async(&mut buf).await.unwrap(),
+                    read_event_into_async(&mut reader, &mut buf).await.unwrap(),
                     Event::End(BytesEnd::new(""))
                 );
             }
@@ -251,7 +257,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader.read_event().expect(
+                            read_event(&mut reader).expect(
                                 "parsing should be possible to continue after `Error::IllFormed`"
                             ),
                             Event::Empty(BytesStart::new("x"))
@@ -277,7 +283,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader.read_event_into(&mut buf).expect(
+                            read_event_into(&mut reader, &mut buf).expect(
                                 "parsing should be possible to continue after `Error::IllFormed`"
                             ),
                             Event::Empty(BytesStart::new("x"))
@@ -304,7 +310,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader.read_event_into_async(&mut buf).await.expect(
+                            read_event_into_async(&mut reader, &mut buf).await.expect(
                                 "parsing should be possible to continue after `Error::IllFormed`"
                             ),
                             Event::Empty(BytesStart::new("x"))
@@ -334,8 +340,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader
-                                .read_resolved_event()
+                            read_resolved_event(&mut reader)
                                 .expect(
                                     "parsing should be possible to continue after `Error::IllFormed`"
                                 )
@@ -363,8 +368,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader
-                                .read_resolved_event_into(&mut buf)
+                            read_resolved_event_into(&mut reader, &mut buf)
                                 .expect(
                                     "parsing should be possible to continue after `Error::IllFormed`"
                                 )
@@ -393,8 +397,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader
-                                .read_resolved_event_into_async(&mut buf)
+                            read_resolved_event_into_async(&mut reader, &mut buf)
                                 .await
                                 .expect(
                                     "parsing should be possible to continue after `Error::IllFormed`"
@@ -437,7 +440,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader.read_event().expect(
+                            read_event(&mut reader).expect(
                                 "parsing should be possible to continue after `Error::IllFormed`"
                             ),
                             Event::Empty(BytesStart::new("x"))
@@ -466,7 +469,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader.read_event_into(&mut buf).expect(
+                            read_event_into(&mut reader, &mut buf).expect(
                                 "parsing should be possible to continue after `Error::IllFormed`"
                             ),
                             Event::Empty(BytesStart::new("x"))
@@ -497,7 +500,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader.read_event_into_async(&mut buf).await.expect(
+                            read_event_into_async(&mut reader, &mut buf).await.expect(
                                 "parsing should be possible to continue after `Error::IllFormed`"
                             ),
                             Event::Empty(BytesStart::new("x"))
@@ -530,8 +533,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader
-                                .read_resolved_event()
+                            read_resolved_event(&mut reader)
                                 .expect(
                                     "parsing should be possible to continue after `Error::IllFormed`"
                                 )
@@ -562,8 +564,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader
-                                .read_resolved_event_into(&mut buf)
+                            read_resolved_event_into(&mut reader, &mut buf)
                                 .expect(
                                     "parsing should be possible to continue after `Error::IllFormed`"
                                 )
@@ -596,8 +597,7 @@ mod ill_formed {
                             x => panic!("Expected `Err(IllFormed(_))`, but got {:?}", x),
                         }
                         assert_eq!(
-                            reader
-                                .read_resolved_event_into_async(&mut buf)
+                            read_resolved_event_into_async(&mut reader, &mut buf)
                                 .await
                                 .expect(
                                     "parsing should be possible to continue after `Error::IllFormed`"

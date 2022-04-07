@@ -53,8 +53,22 @@ use crate::escape::{
     partial_escape,
 };
 use crate::name::{LocalName, QName};
+#[cfg(feature = "span")]
+use crate::reader::Span;
 use crate::utils::{self, name_len, trim_xml_end, trim_xml_start, write_cow_string};
 use attributes::{AttrError, Attribute, Attributes};
+
+/// A trait for get a span information
+#[cfg(feature = "span")]
+pub trait Spanned {
+    /// Returns a span that type is occupied in the input
+    fn span(&self) -> Span;
+
+    /// Sets the span of this holder to a given value
+    fn with_span(self, span: Span) -> Self;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Opening tag data (`Event::Start`), with optional attributes: `<name attr="value">`.
 ///
@@ -66,6 +80,8 @@ use attributes::{AttrError, Attribute, Attributes};
 ///
 /// ```
 /// # use quick_xml::events::{BytesStart, Event};
+/// # #[cfg(feature = "span")]
+/// # use quick_xml::events::Spanned;
 /// # use quick_xml::reader::Reader;
 /// # use pretty_assertions::assert_eq;
 /// // Remember, that \ at the end of string literal strips
@@ -76,6 +92,9 @@ use attributes::{AttrError, Attribute, Attributes};
 /// );
 /// let content = "element a1 = 'val1' a2=\"val2\" ";
 /// let event = BytesStart::from_content(content, 7);
+/// #
+/// # #[cfg(feature = "span")]
+/// # let event = event.with_span(0..33);
 ///
 /// assert_eq!(reader.read_event().unwrap(), Event::Empty(event.borrow()));
 /// assert_eq!(reader.read_event().unwrap(), Event::Start(event.borrow()));
@@ -103,6 +122,11 @@ pub struct BytesStart<'i> {
     pub(crate) buf: Cow<'i, str>,
     /// end of the element name, the name starts at that the start of `buf`
     pub(crate) name_len: usize,
+
+    /// A span that covers event from beginning `<` to the end `>` (i.e. [`Span::end`]
+    /// is a one byte after `>`)
+    #[cfg(feature = "span")]
+    span: Span,
 }
 
 impl<'i> BytesStart<'i> {
@@ -112,6 +136,9 @@ impl<'i> BytesStart<'i> {
         BytesStart {
             buf: Cow::Borrowed(content),
             name_len,
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -126,6 +153,9 @@ impl<'i> BytesStart<'i> {
         BytesStart {
             name_len: buf.len(),
             buf,
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -141,6 +171,9 @@ impl<'i> BytesStart<'i> {
         BytesStart {
             buf: content.into(),
             name_len,
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -149,6 +182,9 @@ impl<'i> BytesStart<'i> {
         BytesStart {
             buf: Cow::Owned(self.buf.into_owned()),
             name_len: self.name_len,
+
+            #[cfg(feature = "span")]
+            span: self.span,
         }
     }
 
@@ -157,6 +193,9 @@ impl<'i> BytesStart<'i> {
         BytesStart {
             buf: Cow::Owned(self.buf.clone().into_owned()),
             name_len: self.name_len,
+
+            #[cfg(feature = "span")]
+            span: self.span.clone(),
         }
     }
 
@@ -189,6 +228,9 @@ impl<'i> BytesStart<'i> {
         BytesStart {
             buf: Cow::Borrowed(&self.buf),
             name_len: self.name_len,
+
+            #[cfg(feature = "span")]
+            span: self.span.clone(),
         }
     }
 
@@ -319,13 +361,26 @@ impl<'i> BytesStart<'i> {
     pub(crate) fn push_indent(&mut self, indent: &str) {
         self.buf.to_mut().push_str(indent);
     }
+
+    /// Returns a span for a tag name
+    #[cfg(feature = "span")]
+    pub fn name_span(&self) -> Span {
+        // +1: skip `<`
+        let start = self.span.start + 1;
+        start..start + self.name_len as u64
+    }
 }
 
 impl<'i> Debug for BytesStart<'i> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "BytesStart {{ buf: ")?;
         write_cow_string(f, &self.buf)?;
-        write!(f, ", name_len: {} }}", self.name_len)
+        write!(f, ", name_len: {}", self.name_len)?;
+
+        #[cfg(feature = "span")]
+        write!(f, ", span: {:?}", &self.span)?;
+
+        write!(f, " }}")
     }
 }
 
@@ -339,6 +394,20 @@ impl<'i> Deref for BytesStart<'i> {
 
 impl AsRef<str> for BytesStart<'_> {
     fn as_ref(&self) -> &str {
+        self
+    }
+}
+
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesStart<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
         self
     }
 }
@@ -373,12 +442,17 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesStart<'i> {
 ///
 /// ```
 /// # use quick_xml::events::{BytesEnd, Event};
+/// # #[cfg(feature = "span")]
+/// # use quick_xml::events::Spanned;
 /// # use quick_xml::reader::Reader;
 /// # use pretty_assertions::assert_eq;
 /// let mut reader = Reader::from_str(r#"<element></element a1 = 'val1' a2="val2" >"#);
 /// // Note, that this entire string considered as a .name()
 /// let content = "element a1 = 'val1' a2=\"val2\" ";
 /// let event = BytesEnd::new(content);
+/// #
+/// # #[cfg(feature = "span")]
+/// # let event = event.with_span(9..42);
 ///
 /// reader.config_mut().trim_markup_names_in_closing_tags = false;
 /// reader.config_mut().check_end_names = false;
@@ -406,13 +480,23 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesStart<'i> {
 #[derive(Clone, Eq, PartialEq)]
 pub struct BytesEnd<'i> {
     name: Cow<'i, str>,
+
+    /// A span that covers event from beginning `<` to the end `>` (i.e. [`Span::end`]
+    /// is one byte after `>`)
+    #[cfg(feature = "span")]
+    span: Span,
 }
 
 impl<'i> BytesEnd<'i> {
     /// Internal constructor, used by `Reader`. Supplies data in reader's encoding
     #[inline]
     pub(crate) const fn wrap(name: Cow<'i, str>) -> Self {
-        BytesEnd { name }
+        Self {
+            name,
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
+        }
     }
 
     /// Creates a new `BytesEnd` borrowing a slice.
@@ -429,6 +513,9 @@ impl<'i> BytesEnd<'i> {
     pub fn into_owned(self) -> BytesEnd<'static> {
         BytesEnd {
             name: Cow::Owned(self.name.into_owned()),
+
+            #[cfg(feature = "span")]
+            span: self.span,
         }
     }
 
@@ -437,6 +524,9 @@ impl<'i> BytesEnd<'i> {
     pub fn borrow(&self) -> BytesEnd<'_> {
         BytesEnd {
             name: Cow::Borrowed(&self.name),
+
+            #[cfg(feature = "span")]
+            span: self.span.clone(),
         }
     }
 
@@ -454,12 +544,24 @@ impl<'i> BytesEnd<'i> {
     pub fn local_name(&self) -> LocalName<'_> {
         self.name().into()
     }
+
+    /// Returns a span for a tag name
+    #[cfg(feature = "span")]
+    pub fn name_span(&self) -> Span {
+        // +2: skip `</`
+        let start = self.span.start + 2;
+        start..start + self.name.len() as u64
+    }
 }
 
 impl<'i> Debug for BytesEnd<'i> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "BytesEnd {{ name: ")?;
         write_cow_string(f, &self.name)?;
+
+        #[cfg(feature = "span")]
+        write!(f, ", span: {:?}", &self.span)?;
+
         write!(f, " }}")
     }
 }
@@ -485,6 +587,20 @@ impl<'i> From<QName<'i>> for BytesEnd<'i> {
     }
 }
 
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesEnd<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'i> arbitrary::Arbitrary<'i> for BytesEnd<'i> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'i>) -> arbitrary::Result<Self> {
@@ -506,6 +622,8 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesEnd<'i> {
 ///
 /// ```
 /// # use quick_xml::events::{BytesText, Event};
+/// # #[cfg(feature = "span")]
+/// # use quick_xml::events::Spanned;
 /// # use quick_xml::reader::Reader;
 /// # use pretty_assertions::assert_eq;
 /// // Remember, that \ at the end of string literal strips
@@ -516,6 +634,9 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesEnd<'i> {
 /// );
 /// let content = "text ";
 /// let event = BytesText::new(content);
+/// #
+/// # #[cfg(feature = "span")]
+/// # let event = event.with_span(0..27);
 ///
 /// assert_eq!(reader.read_event().unwrap(), Event::DocType(event.borrow()));
 /// assert_eq!(reader.read_event().unwrap(), Event::Text(event.borrow()));
@@ -534,10 +655,14 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesEnd<'i> {
 /// using [`.into_owned()`].
 ///
 /// [`.into_owned()`]: Self::into_owned
-#[derive(Clone, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct BytesText<'i> {
     /// Escaped content of the event
     content: Cow<'i, str>,
+
+    /// A span that covers event
+    #[cfg(feature = "span")]
+    span: Span,
 }
 
 impl<'i> BytesText<'i> {
@@ -546,6 +671,9 @@ impl<'i> BytesText<'i> {
     pub(crate) const fn wrap(content: &'i str) -> Self {
         Self {
             content: Cow::Borrowed(content),
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -564,6 +692,9 @@ impl<'i> BytesText<'i> {
     pub fn from_escaped<C: Into<Cow<'i, str>>>(content: C) -> Self {
         Self {
             content: content.into(),
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -594,6 +725,9 @@ impl<'i> BytesText<'i> {
     pub fn into_owned(self) -> BytesText<'static> {
         BytesText {
             content: Cow::Owned(self.content.into_owned()),
+
+            #[cfg(feature = "span")]
+            span: self.span,
         }
     }
 
@@ -608,6 +742,9 @@ impl<'i> BytesText<'i> {
     pub fn borrow(&self) -> BytesText<'_> {
         BytesText {
             content: Cow::Borrowed(&self.content),
+
+            #[cfg(feature = "span")]
+            span: self.span.clone(),
         }
     }
 
@@ -691,6 +828,10 @@ impl<'i> Debug for BytesText<'i> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "BytesText {{ content: ")?;
         write_cow_string(f, &self.content)?;
+
+        #[cfg(feature = "span")]
+        write!(f, ", span: {:?}", &self.span)?;
+
         write!(f, " }}")
     }
 }
@@ -705,6 +846,20 @@ impl<'i> Deref for BytesText<'i> {
 
 impl AsRef<str> for BytesText<'_> {
     fn as_ref(&self) -> &str {
+        self
+    }
+}
+
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesText<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
         self
     }
 }
@@ -736,11 +891,16 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesText<'i> {
 ///
 /// ```
 /// # use quick_xml::events::{BytesCData, Event};
+/// # #[cfg(feature = "span")]
+/// # use quick_xml::events::Spanned;
 /// # use quick_xml::reader::Reader;
 /// # use pretty_assertions::assert_eq;
 /// let mut reader = Reader::from_str("<![CDATA[ CDATA section ]]>");
 /// let content = " CDATA section ";
 /// let event = BytesCData::new(content);
+/// #
+/// # #[cfg(feature = "span")]
+/// # let event = event.with_span(0..27);
 ///
 /// assert_eq!(reader.read_event().unwrap(), Event::CData(event.borrow()));
 /// // deref coercion of &BytesCData to &str
@@ -758,9 +918,14 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesText<'i> {
 /// using [`.into_owned()`].
 ///
 /// [`.into_owned()`]: Self::into_owned
-#[derive(Clone, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct BytesCData<'i> {
     content: Cow<'i, str>,
+
+    /// A span that covers event from beginning `<` to the end `>` (i.e. [`Span::end`]
+    /// is one byte after `>`)
+    #[cfg(feature = "span")]
+    span: Span,
 }
 
 impl<'i> BytesCData<'i> {
@@ -769,6 +934,9 @@ impl<'i> BytesCData<'i> {
     pub(crate) const fn wrap(content: &'i str) -> Self {
         Self {
             content: Cow::Borrowed(content),
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -782,6 +950,9 @@ impl<'i> BytesCData<'i> {
     pub fn new<C: Into<Cow<'i, str>>>(content: C) -> Self {
         Self {
             content: content.into(),
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -830,6 +1001,9 @@ impl<'i> BytesCData<'i> {
     pub fn into_owned(self) -> BytesCData<'static> {
         BytesCData {
             content: Cow::Owned(self.content.into_owned()),
+
+            #[cfg(feature = "span")]
+            span: self.span,
         }
     }
 
@@ -844,6 +1018,9 @@ impl<'i> BytesCData<'i> {
     pub fn borrow(&self) -> BytesCData<'_> {
         BytesCData {
             content: Cow::Borrowed(&self.content),
+
+            #[cfg(feature = "span")]
+            span: self.span.clone(),
         }
     }
 
@@ -968,6 +1145,10 @@ impl<'i> Debug for BytesCData<'i> {
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
         write!(f, "BytesCData {{ content: ")?;
         write_cow_string(f, &self.content)?;
+
+        #[cfg(feature = "span")]
+        write!(f, ", span: {:?}", &self.span)?;
+
         write!(f, " }}")
     }
 }
@@ -982,6 +1163,20 @@ impl<'i> Deref for BytesCData<'i> {
 
 impl AsRef<str> for BytesCData<'_> {
     fn as_ref(&self) -> &str {
+        self
+    }
+}
+
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesCData<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
         self
     }
 }
@@ -1047,7 +1242,7 @@ impl FusedIterator for CDataIterator<'_> {}
 ///
 /// [`Config::check_comments`]: crate::reader::Config::check_comments
 /// [`.into_owned()`]: Self::into_owned
-#[derive(Clone, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct BytesComment<'i> {
     content: BytesText<'i>,
 }
@@ -1172,6 +1367,20 @@ impl AsRef<str> for BytesComment<'_> {
     }
 }
 
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesComment<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.content.span()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.content.span = span;
+        self
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'i> arbitrary::Arbitrary<'i> for BytesComment<'i> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'i>) -> arbitrary::Result<Self> {
@@ -1198,11 +1407,16 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesComment<'i> {
 ///
 /// ```
 /// # use quick_xml::events::{BytesPI, Event};
+/// # #[cfg(feature = "span")]
+/// # use quick_xml::events::Spanned;
 /// # use quick_xml::reader::Reader;
 /// # use pretty_assertions::assert_eq;
 /// let mut reader = Reader::from_str("<?processing instruction >:-<~ ?>");
 /// let content = "processing instruction >:-<~ ";
 /// let event = BytesPI::new(content);
+/// #
+/// # #[cfg(feature = "span")]
+/// # let event = event.with_span(0..33);
 ///
 /// assert_eq!(reader.read_event().unwrap(), Event::PI(event.borrow()));
 /// // deref coercion of &BytesPI to &str
@@ -1245,7 +1459,13 @@ impl<'i> BytesPI<'i> {
         let buf: Cow<'i, str> = content.into();
         let name_len = name_len(buf.as_bytes());
         Self {
-            content: BytesStart { buf, name_len },
+            content: BytesStart {
+                buf,
+                name_len,
+
+                #[cfg(feature = "span")]
+                span: Span { start: 0, end: 0 },
+            },
         }
     }
 
@@ -1363,6 +1583,20 @@ impl AsRef<str> for BytesPI<'_> {
     }
 }
 
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesPI<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.content.span()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.content.span = span;
+        self
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'i> arbitrary::Arbitrary<'i> for BytesPI<'i> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'i>) -> arbitrary::Result<Self> {
@@ -1386,11 +1620,16 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesPI<'i> {
 ///
 /// ```
 /// # use quick_xml::events::{BytesDecl, BytesStart, Event};
+/// # #[cfg(feature = "span")]
+/// # use quick_xml::events::Spanned;
 /// # use quick_xml::reader::Reader;
 /// # use pretty_assertions::assert_eq;
 /// let mut reader = Reader::from_str("<?xml version = '1.0' ?>");
 /// let content = "xml version = '1.0' ";
 /// let event = BytesDecl::from_start(BytesStart::from_content(content, 3));
+/// #
+/// # #[cfg(feature = "span")]
+/// # let event = event.with_span(0..24);
 ///
 /// assert_eq!(reader.read_event().unwrap(), Event::Decl(event.borrow()));
 /// // deref coercion of &BytesDecl to &str
@@ -1722,6 +1961,20 @@ impl AsRef<str> for BytesDecl<'_> {
     }
 }
 
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesDecl<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.content.span()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.content.span = span;
+        self
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'i> arbitrary::Arbitrary<'i> for BytesDecl<'i> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'i>) -> arbitrary::Result<Self> {
@@ -1746,11 +1999,16 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesDecl<'i> {
 ///
 /// ```
 /// # use quick_xml::events::{BytesRef, Event};
+/// # #[cfg(feature = "span")]
+/// # use quick_xml::events::Spanned;
 /// # use quick_xml::reader::Reader;
 /// # use pretty_assertions::assert_eq;
 /// let mut reader = Reader::from_str(r#"&entity;"#);
 /// let content = "entity";
 /// let event = BytesRef::new(content);
+/// #
+/// # #[cfg(feature = "span")]
+/// # let event = event.with_span(0..8);
 ///
 /// assert_eq!(reader.read_event().unwrap(), Event::GeneralRef(event.borrow()));
 /// // deref coercion of &BytesRef to &str
@@ -1771,6 +2029,10 @@ impl<'i> arbitrary::Arbitrary<'i> for BytesDecl<'i> {
 #[derive(Clone, Eq, PartialEq)]
 pub struct BytesRef<'i> {
     content: Cow<'i, str>,
+
+    /// A span that covers event
+    #[cfg(feature = "span")]
+    span: Span,
 }
 
 impl<'i> BytesRef<'i> {
@@ -1779,6 +2041,9 @@ impl<'i> BytesRef<'i> {
     pub(crate) const fn wrap(content: &'i str) -> Self {
         Self {
             content: Cow::Borrowed(content),
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -1791,6 +2056,9 @@ impl<'i> BytesRef<'i> {
     pub fn new<C: Into<Cow<'i, str>>>(name: C) -> Self {
         Self {
             content: name.into(),
+
+            #[cfg(feature = "span")]
+            span: Span { start: 0, end: 0 },
         }
     }
 
@@ -1798,6 +2066,9 @@ impl<'i> BytesRef<'i> {
     pub fn into_owned(self) -> BytesRef<'static> {
         BytesRef {
             content: Cow::Owned(self.content.into_owned()),
+
+            #[cfg(feature = "span")]
+            span: self.span,
         }
     }
 
@@ -1812,6 +2083,9 @@ impl<'i> BytesRef<'i> {
     pub fn borrow(&self) -> BytesRef<'_> {
         BytesRef {
             content: Cow::Borrowed(&self.content),
+
+            #[cfg(feature = "span")]
+            span: self.span.clone(),
         }
     }
 
@@ -1934,6 +2208,20 @@ impl AsRef<str> for BytesRef<'_> {
     }
 }
 
+#[cfg(feature = "span")]
+impl<'i> Spanned for BytesRef<'i> {
+    #[inline]
+    fn span(&self) -> Span {
+        self.span.clone()
+    }
+
+    #[inline]
+    fn with_span(mut self, span: Span) -> Self {
+        self.span = span;
+        self
+    }
+}
+
 #[cfg(feature = "arbitrary")]
 impl<'i> arbitrary::Arbitrary<'i> for BytesRef<'i> {
     fn arbitrary(u: &mut arbitrary::Unstructured<'i>) -> arbitrary::Result<Self> {
@@ -2047,6 +2335,43 @@ impl<'i> Deref for Event<'i> {
 impl<'i> AsRef<Event<'i>> for Event<'i> {
     fn as_ref(&self) -> &Event<'i> {
         self
+    }
+}
+
+#[cfg(feature = "span")]
+impl<'a> Spanned for Event<'a> {
+    #[inline]
+    fn span(&self) -> Span {
+        match self {
+            Event::Start(e) => e.span(),
+            Event::End(e) => e.span(),
+            Event::Empty(e) => e.span(),
+            Event::Text(e) => e.span(),
+            Event::Comment(e) => e.span(),
+            Event::CData(e) => e.span(),
+            Event::Decl(e) => e.span(),
+            Event::PI(e) => e.span(),
+            Event::DocType(e) => e.span(),
+            Event::GeneralRef(e) => e.span(),
+            Event::Eof => Span { start: 0, end: 0 },
+        }
+    }
+
+    #[inline]
+    fn with_span(self, span: Span) -> Self {
+        match self {
+            Event::Start(e) => Event::Start(e.with_span(span)),
+            Event::End(e) => Event::End(e.with_span(span)),
+            Event::Empty(e) => Event::Empty(e.with_span(span)),
+            Event::Text(e) => Event::Text(e.with_span(span)),
+            Event::Comment(e) => Event::Comment(e.with_span(span)),
+            Event::CData(e) => Event::CData(e.with_span(span)),
+            Event::Decl(e) => Event::Decl(e.with_span(span)),
+            Event::PI(e) => Event::PI(e.with_span(span)),
+            Event::DocType(e) => Event::DocType(e.with_span(span)),
+            Event::GeneralRef(e) => Event::GeneralRef(e.with_span(span)),
+            Event::Eof => Event::Eof,
+        }
     }
 }
 

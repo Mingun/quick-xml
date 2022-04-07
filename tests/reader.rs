@@ -8,6 +8,7 @@ use pretty_assertions::assert_eq;
 // Import `small_buffers_tests!`
 #[macro_use]
 mod helpers;
+use helpers::{read_event, read_event_into};
 
 small_buffers_tests!(
     #[test]
@@ -18,16 +19,16 @@ small_buffers_tests!(
 fn test_start_end() {
     let mut r = Reader::from_str("<a></a>");
 
-    assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("a")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
 fn test_start_end_with_ws() {
     let mut r = Reader::from_str("<a></a >");
 
-    assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("a")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
@@ -35,10 +36,10 @@ fn test_start_end_attr() {
     let mut r = Reader::from_str("<a b=\"test\"></a>");
 
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Start(BytesStart::from_content("a b=\"test\"", 1))
     );
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
@@ -46,7 +47,7 @@ fn test_empty_attr() {
     let mut r = Reader::from_str("<a b=\"test\" />");
 
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Empty(BytesStart::from_content("a b=\"test\" ", 1))
     );
 }
@@ -56,29 +57,29 @@ fn test_start_end_comment() {
     let mut r = Reader::from_str("<b><a b=\"test\" c=\"test\"/> <a  /><!--t--></b>");
     r.config_mut().trim_text(true);
 
-    assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("b")));
+    assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("b")));
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Empty(BytesStart::from_content("a b=\"test\" c=\"test\"", 1))
     );
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Empty(BytesStart::from_content("a  ", 1))
     );
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Comment(BytesComment::new("t").unwrap())
     );
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("b")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("b")));
 }
 
 #[test]
 fn test_start_txt_end() {
     let mut r = Reader::from_str("<a>test</a>");
 
-    assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("a")));
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::new("test")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), Text(BytesText::new("test")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
@@ -86,7 +87,7 @@ fn test_comment() {
     let mut r = Reader::from_str("<!--test-->");
 
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Comment(BytesComment::new("test").unwrap())
     );
 }
@@ -94,7 +95,7 @@ fn test_comment() {
 #[test]
 fn test_xml_decl() {
     let mut r = Reader::from_str("<?xml version=\"1.0\" encoding='utf-8'?>");
-    match r.read_event().unwrap() {
+    match read_event(&mut r).unwrap() {
         Decl(ref e) => {
             match e.version() {
                 Ok(v) => assert_eq!(
@@ -128,7 +129,7 @@ fn test_xml_decl() {
 fn test_cdata() {
     let mut r = Reader::from_str("<![CDATA[test]]>");
 
-    assert_eq!(r.read_event().unwrap(), CData(BytesCData::new("test")));
+    assert_eq!(read_event(&mut r).unwrap(), CData(BytesCData::new("test")));
 }
 
 #[test]
@@ -136,7 +137,7 @@ fn test_cdata_open_close() {
     let mut r = Reader::from_str("<![CDATA[test <> test]]>");
 
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         CData(BytesCData::new("test <> test"))
     );
 }
@@ -146,7 +147,7 @@ fn test_start_attr() {
     let mut r = Reader::from_str("<a b=\"c\">");
 
     assert_eq!(
-        r.read_event().unwrap(),
+        read_event(&mut r).unwrap(),
         Start(BytesStart::from_content("a b=\"c\"", 1))
     );
 }
@@ -155,21 +156,21 @@ fn test_start_attr() {
 fn test_nested() {
     let mut r = Reader::from_str("<a><b>test</b><c/></a>");
 
-    assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("a")));
-    assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("b")));
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::new("test")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("b")));
-    assert_eq!(r.read_event().unwrap(), Empty(BytesStart::new("c")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("b")));
+    assert_eq!(read_event(&mut r).unwrap(), Text(BytesText::new("test")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("b")));
+    assert_eq!(read_event(&mut r).unwrap(), Empty(BytesStart::new("c")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
 fn test_escaped_content() {
     let mut r = Reader::from_str("<a>&lt;test&gt;</a>");
 
-    assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("a")));
-    assert_eq!(r.read_event().unwrap(), GeneralRef(BytesRef::new("lt")));
-    match r.read_event() {
+    assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), GeneralRef(BytesRef::new("lt")));
+    match read_event(&mut r) {
         Ok(Text(e)) => {
             assert_eq!(
                 e.as_ref(),
@@ -186,8 +187,8 @@ fn test_escaped_content() {
             e
         ),
     }
-    assert_eq!(r.read_event().unwrap(), GeneralRef(BytesRef::new("gt")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("a")));
+    assert_eq!(read_event(&mut r).unwrap(), GeneralRef(BytesRef::new("gt")));
+    assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("a")));
 }
 
 #[test]
@@ -231,39 +232,39 @@ mod double_dash {
     fn text1() {
         let mut r = Reader::from_str("<hello>-- </hello>");
 
-        assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("hello")));
-        assert_eq!(r.read_event().unwrap(), Text(BytesText::new("-- ")));
-        assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), Text(BytesText::new("-- ")));
+        assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("hello")));
     }
 
     #[test]
     fn text2() {
         let mut r = Reader::from_str("<hello>--</hello>");
 
-        assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("hello")));
-        assert_eq!(r.read_event().unwrap(), Text(BytesText::new("--")));
-        assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), Text(BytesText::new("--")));
+        assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("hello")));
     }
 
     #[test]
     fn text3() {
         let mut r = Reader::from_str("<hello>--></hello>");
 
-        assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("hello")));
         assert_eq!(
-            r.read_event().unwrap(),
+            read_event(&mut r).unwrap(),
             Text(BytesText::from_escaped("-->"))
         );
-        assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("hello")));
     }
 
     #[test]
     fn cdata() {
         let mut r = Reader::from_str("<hello><![CDATA[--]]></hello>");
 
-        assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("hello")));
-        assert_eq!(r.read_event().unwrap(), CData(BytesCData::new("--")));
-        assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("hello")));
+        assert_eq!(read_event(&mut r).unwrap(), CData(BytesCData::new("--")));
+        assert_eq!(read_event(&mut r).unwrap(), End(BytesEnd::new("hello")));
     }
 }
 
@@ -282,9 +283,9 @@ mod read_to_end {
             //                            ^0   ^5    ^11
             r.config_mut().trim_text(true);
 
-            assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
+            assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("tag")));
             assert_eq!(r.read_to_end(QName("tag")).unwrap(), 5..11);
-            assert_eq!(r.read_event().unwrap(), Eof);
+            assert_eq!(read_event(&mut r).unwrap(), Eof);
         }
 
         #[test]
@@ -293,9 +294,9 @@ mod read_to_end {
             //                            ^0   ^5         ^16
             r.config_mut().trim_text(true);
 
-            assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
+            assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("tag")));
             assert_eq!(r.read_to_end(QName("tag")).unwrap(), 5..16);
-            assert_eq!(r.read_event().unwrap(), Eof);
+            assert_eq!(read_event(&mut r).unwrap(), Eof);
         }
     }
 
@@ -311,7 +312,7 @@ mod read_to_end {
 
             let mut buf = Vec::new();
             assert_eq!(
-                r.read_event_into(&mut buf).unwrap(),
+                read_event_into(&mut r, &mut buf).unwrap(),
                 Start(BytesStart::new("tag"))
             );
             assert_eq!(r.read_to_end_into(QName("tag"), &mut buf).unwrap(), 5..11);
@@ -326,7 +327,7 @@ mod read_to_end {
 
             let mut buf = Vec::new();
             assert_eq!(
-                r.read_event_into(&mut buf).unwrap(),
+                read_event_into(&mut r, &mut buf).unwrap(),
                 Start(BytesStart::new("tag"))
             );
             assert_eq!(r.read_to_end_into(QName("tag"), &mut buf).unwrap(), 5..16);
@@ -346,12 +347,12 @@ mod read_text {
         let mut r = Reader::from_str("<tag> text </tag>");
         r.config_mut().trim_text(true);
 
-        assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
+        assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("tag")));
         assert_eq!(
             r.read_text(QName("tag")).unwrap(),
             BytesText::from_escaped(" text ")
         );
-        assert_eq!(r.read_event().unwrap(), Eof);
+        assert_eq!(read_event(&mut r).unwrap(), Eof);
     }
 
     #[test]
@@ -359,11 +360,11 @@ mod read_text {
         let mut r = Reader::from_str("<tag> <nested/> </tag>");
         r.config_mut().trim_text(true);
 
-        assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
+        assert_eq!(read_event(&mut r).unwrap(), Start(BytesStart::new("tag")));
         assert_eq!(
             r.read_text(QName("tag")).unwrap(),
             BytesText::from_escaped(" <nested/> ")
         );
-        assert_eq!(r.read_event().unwrap(), Eof);
+        assert_eq!(read_event(&mut r).unwrap(), Eof);
     }
 }

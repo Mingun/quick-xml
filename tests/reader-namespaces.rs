@@ -9,6 +9,9 @@ use quick_xml::name::{Namespace, PrefixDeclaration, QName};
 use quick_xml::reader::NsReader;
 use std::borrow::Cow;
 
+mod helpers;
+use helpers::{read_resolved_event, read_resolved_event_into};
+
 #[test]
 fn namespace() {
     let mut r = NsReader::from_str("<a xmlns:myns='www1'><myns:b>in namespace!</myns:b></a>");
@@ -914,7 +917,7 @@ mod read_to_end_into {
         );
         let buf = &mut Vec::new();
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (
                 Bound(Namespace("namespace")),
                 Start(BytesStart::from_content("root xmlns='namespace'", 4)),
@@ -926,7 +929,7 @@ mod read_to_end_into {
             30..50 // <root/><root></root>
         );
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (Unbound, Empty(BytesStart::new("element")))
         );
         assert_eq!(reader.read_event_into(buf).unwrap(), Eof);
@@ -945,7 +948,7 @@ mod read_to_end_into {
         );
         let buf = &mut Vec::new();
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (
                 Bound(Namespace("namespace")),
                 Start(BytesStart::from_content("root xmlns='namespace'", 4)),
@@ -960,7 +963,7 @@ mod read_to_end_into {
             38..58 // <root/><root></root>
         );
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (Unbound, Empty(BytesStart::new("element")))
         );
         assert_eq!(reader.read_event_into(buf).unwrap(), Eof);
@@ -980,14 +983,14 @@ mod read_to_end_into {
         let buf = &mut Vec::new();
         reader.config_mut().check_end_names = false;
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (
                 Bound(Namespace("namespace")),
                 Start(BytesStart::from_content("root xmlns='namespace'", 4)),
             )
         );
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (Bound(Namespace("namespace")), Start(BytesStart::new("tag")),)
         );
         assert_eq!(
@@ -996,7 +999,7 @@ mod read_to_end_into {
         );
         // NOTE: due to unbalanced XML namespace still not closed
         assert_eq!(
-            reader.read_resolved_event().unwrap(),
+            read_resolved_event(&mut reader).unwrap(),
             (
                 Bound(Namespace("namespace")),
                 Empty(BytesStart::new("element"))
@@ -1088,7 +1091,7 @@ mod read_to_end_into {
         );
         let buf = &mut Vec::new();
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (
                 Bound(Namespace("namespace")),
                 Start(BytesStart::from_content("root xmlns='namespace'", 4)),
@@ -1103,7 +1106,7 @@ mod read_to_end_into {
             28..48 // <root/><root></root>
         );
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (Unbound, Empty(BytesStart::new("element")))
         );
         assert_eq!(reader.read_event_into(buf).unwrap(), Eof);
@@ -1156,7 +1159,7 @@ mod read_to_end_into {
         );
         let buf = &mut Vec::new();
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (
                 Bound(Namespace("namespace")),
                 Start(BytesStart::from_content("root xmlns='namespace'", 4)),
@@ -1171,7 +1174,7 @@ mod read_to_end_into {
             32..52 // <root/><root></root>
         );
         assert_eq!(
-            reader.read_resolved_event_into(buf).unwrap(),
+            read_resolved_event_into(&mut reader, buf).unwrap(),
             (Unbound, Empty(BytesStart::new("element")))
         );
         assert_eq!(reader.read_event_into(buf).unwrap(), Eof);
@@ -1196,7 +1199,7 @@ mod read_text {
             <element/>",
         );
         assert_eq!(
-            reader.read_resolved_event().unwrap(),
+            read_resolved_event(&mut reader).unwrap(),
             (
                 Bound(Namespace("namespace")),
                 Start(BytesStart::from_content("root xmlns='namespace'", 4)),

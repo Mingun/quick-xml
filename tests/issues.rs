@@ -14,6 +14,9 @@ use quick_xml::utils::Bytes;
 
 use pretty_assertions::assert_eq;
 
+mod helpers;
+use helpers::{read_event, read_event_into};
+
 /// Regression test for https://github.com/tafia/quick-xml/issues/94
 #[test]
 fn issue94() {
@@ -125,8 +128,8 @@ mod issue514 {
         let html_start = BytesStart::new("html");
         let html_end = html_start.to_end().into_owned();
 
-        assert_eq!(reader.read_event().unwrap(), Event::Start(outer_start));
-        assert_eq!(reader.read_event().unwrap(), Event::Start(html_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(outer_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(html_start));
 
         reader.config_mut().check_end_names = false;
 
@@ -137,8 +140,8 @@ mod issue514 {
 
         reader.config_mut().check_end_names = true;
 
-        assert_eq!(reader.read_event().unwrap(), Event::End(outer_end));
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
+        assert_eq!(read_event(&mut reader).unwrap(), Event::End(outer_end));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Eof);
     }
 
     /// Canary check that legitimate error is reported
@@ -151,8 +154,8 @@ mod issue514 {
         let html_start = BytesStart::new("html");
         let html_end = html_start.to_end().into_owned();
 
-        assert_eq!(reader.read_event().unwrap(), Event::Start(outer_start));
-        assert_eq!(reader.read_event().unwrap(), Event::Start(html_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(outer_start));
+        assert_eq!(read_event(&mut reader).unwrap(), Event::Start(html_start));
 
         reader.config_mut().check_end_names = false;
 
@@ -240,14 +243,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         match reader.read_event_into(&mut buf) {
             Err(Error::Syntax(SyntaxError::UnclosedComment)) => {}
             x => panic!("Expected `Err(Syntax(UnclosedComment))`, but got `{:?}`", x),
         }
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 
     #[test]
@@ -256,14 +259,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         match reader.read_event_into(&mut buf) {
             Err(Error::Syntax(SyntaxError::UnclosedComment)) => {}
             x => panic!("Expected `Err(Syntax(UnclosedComment))`, but got `{:?}`", x),
         }
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 
     /// According to the grammar, `>` is allowed just in start of comment.
@@ -274,14 +277,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Comment(BytesComment::new(">").unwrap())
         );
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 
     /// According to the grammar, `->` is allowed just in start of comment.
@@ -292,14 +295,14 @@ mod issue604 {
         let mut reader = Reader::from_reader(data.as_slice());
         let mut buf = Vec::new();
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Decl(BytesDecl::new("1.0", None, None))
         );
         assert_eq!(
-            reader.read_event_into(&mut buf).unwrap(),
+            read_event_into(&mut reader, &mut buf).unwrap(),
             Event::Comment(BytesComment::new("->").unwrap())
         );
-        assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+        assert_eq!(read_event_into(&mut reader, &mut buf).unwrap(), Event::Eof);
     }
 }
 
@@ -310,7 +313,7 @@ fn issue622() {
     reader.config_mut().trim_text(true);
 
     assert_eq!(
-        reader.read_event().unwrap(),
+        read_event(&mut reader).unwrap(),
         Event::Text(BytesText::from_escaped(">"))
     );
     match reader.read_event() {
@@ -336,7 +339,7 @@ mod issue623 {
         reader.config_mut().trim_text(true);
 
         assert_eq!(
-            (reader.read_event().unwrap(), reader.buffer_position()),
+            (read_event(&mut reader).unwrap(), reader.buffer_position()),
             (Event::Start(BytesStart::new("AppendedData")), 27)
         );
 
@@ -352,7 +355,7 @@ mod issue623 {
         assert_eq!(reader.buffer_position(), 61);
 
         assert_eq!(
-            (reader.read_event().unwrap(), reader.buffer_position()),
+            (read_event(&mut reader).unwrap(), reader.buffer_position()),
             (Event::End(BytesEnd::new("AppendedData")), 89)
         );
 
@@ -373,7 +376,7 @@ mod issue623 {
 
         assert_eq!(
             (
-                reader.read_event_into(&mut buf).unwrap(),
+                read_event_into(&mut reader, &mut buf).unwrap(),
                 reader.buffer_position()
             ),
             (Event::Start(BytesStart::new("AppendedData")), 27)
@@ -392,7 +395,7 @@ mod issue623 {
 
         assert_eq!(
             (
-                reader.read_event_into(&mut buf).unwrap(),
+                read_event_into(&mut reader, &mut buf).unwrap(),
                 reader.buffer_position()
             ),
             (Event::End(BytesEnd::new("AppendedData")), 89)
@@ -496,15 +499,15 @@ fn issue774() {
     let mut buf = Vec::new();
 
     assert_eq!(
-        reader.read_event_into(&mut buf).unwrap(),
+        read_event_into(&mut reader, &mut buf).unwrap(),
         Event::Start(BytesStart::new("tag"))
     );
     assert_eq!(
-        reader.read_event_into(&mut buf).unwrap(),
+        read_event_into(&mut reader, &mut buf).unwrap(),
         Event::Text(BytesText::new("text"))
     );
     assert_eq!(
-        reader.read_event_into(&mut buf).unwrap(),
+        read_event_into(&mut reader, &mut buf).unwrap(),
         Event::End(BytesEnd::new("tag"))
     );
 }
@@ -518,20 +521,20 @@ fn issue776() {
     reader.config_mut().check_end_names = false;
 
     assert_eq!(
-        reader.read_event().unwrap(),
+        read_event(&mut reader).unwrap(),
         Event::Start(BytesStart::new("tag"))
     );
     assert_eq!(
-        reader.read_event().unwrap(),
+        read_event(&mut reader).unwrap(),
         Event::End(BytesEnd::new("tag/"))
     );
 
     assert_eq!(
-        reader.read_event().unwrap(),
+        read_event(&mut reader).unwrap(),
         Event::Start(BytesStart::new("tag"))
     );
     assert_eq!(
-        reader.read_event().unwrap(),
+        read_event(&mut reader).unwrap(),
         Event::End(BytesEnd::new(r#"tag attr=">""#))
     );
 }
@@ -624,7 +627,7 @@ fn issue939() {
     let mut buf = Vec::new();
 
     assert_eq!(
-        reader.read_event_into(&mut buf).unwrap(),
+        read_event_into(&mut reader, &mut buf).unwrap(),
         Event::Start(BytesStart::new("r"))
     );
     assert_eq!(
@@ -637,7 +640,7 @@ fn issue939() {
     );
 
     assert_eq!(
-        reader.read_event_into(&mut buf).unwrap(),
+        read_event_into(&mut reader, &mut buf).unwrap(),
         Event::End(BytesEnd::new("r"))
     );
     assert_eq!(

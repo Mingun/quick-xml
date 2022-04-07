@@ -11,6 +11,7 @@ use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
 // Import `small_buffers_tests!`
 #[macro_use]
 mod helpers;
+use helpers::read_event_into_async;
 
 small_buffers_tests!(
     #[tokio::test]
@@ -58,7 +59,7 @@ mod read_to_end {
 
         let mut buf = Vec::new();
         assert_eq!(
-            r.read_event_into_async(&mut buf).await.unwrap(),
+            read_event_into_async(&mut r, &mut buf).await.unwrap(),
             Start(BytesStart::new("tag"))
         );
         assert_eq!(
@@ -78,7 +79,7 @@ mod read_to_end {
 
         let mut buf = Vec::new();
         assert_eq!(
-            r.read_event_into_async(&mut buf).await.unwrap(),
+            read_event_into_async(&mut r, &mut buf).await.unwrap(),
             Start(BytesStart::new("tag"))
         );
         assert_eq!(
@@ -105,7 +106,7 @@ async fn issue623() {
 
     assert_eq!(
         (
-            reader.read_event_into_async(&mut buf).await.unwrap(),
+            read_event_into_async(&mut reader, &mut buf).await.unwrap(),
             reader.buffer_position()
         ),
         (Start(BytesStart::new("AppendedData")), 23)
@@ -124,7 +125,7 @@ async fn issue623() {
 
     assert_eq!(
         (
-            reader.read_event_into_async(&mut buf).await.unwrap(),
+            read_event_into_async(&mut reader, &mut buf).await.unwrap(),
             reader.buffer_position()
         ),
         (End(BytesEnd::new("AppendedData")), 77)
@@ -208,15 +209,15 @@ async fn issue774() {
     let mut buf = Vec::new();
 
     assert_eq!(
-        reader.read_event_into_async(&mut buf).await.unwrap(),
+        read_event_into_async(&mut reader, &mut buf).await.unwrap(),
         Start(BytesStart::new("tag"))
     );
     assert_eq!(
-        reader.read_event_into_async(&mut buf).await.unwrap(),
+        read_event_into_async(&mut reader, &mut buf).await.unwrap(),
         Text(BytesText::new("text"))
     );
     assert_eq!(
-        reader.read_event_into_async(&mut buf).await.unwrap(),
+        read_event_into_async(&mut reader, &mut buf).await.unwrap(),
         End(BytesEnd::new("tag"))
     );
 }

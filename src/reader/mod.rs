@@ -319,7 +319,7 @@ macro_rules! read_event_impl {
                         // Go to Done state
                         ReadRefResult::UpToEof(bytes) if $self.state.config.allow_dangling_amp => {
                             $self.state.state = ParseState::Done;
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text($self.state.emit_text(start, bytes)?))
                         }
                         ReadRefResult::UpToEof(_) => {
                             $self.state.state = ParseState::Done;
@@ -328,7 +328,7 @@ macro_rules! read_event_impl {
                         }
                         // Do not change state, stay in InsideRef
                         ReadRefResult::UpToRef(bytes) if $self.state.config.allow_dangling_amp => {
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text($self.state.emit_text(start, bytes)?))
                         }
                         ReadRefResult::UpToRef(_) => {
                             $self.state.last_error_offset = start;
@@ -337,7 +337,7 @@ macro_rules! read_event_impl {
                         // Go to InsideMarkup state
                         ReadRefResult::UpToMarkup(bytes) if $self.state.config.allow_dangling_amp => {
                             $self.state.state = ParseState::InsideMarkup;
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text($self.state.emit_text(start, bytes)?))
                         }
                         ReadRefResult::UpToMarkup(_) => {
                             $self.state.state = ParseState::InsideMarkup;
@@ -351,6 +351,9 @@ macro_rules! read_event_impl {
                     if $self.state.config.trim_text_start {
                         $reader.skip_whitespace(&mut $self.state.offset) $(.$await)? ?;
                     }
+
+                    // Position just after `>`
+                    let start = $self.state.offset;
 
                     match $reader.read_text($buf, &mut $self.state.offset) $(.$await)? {
                         ReadTextResult::Markup(buf) => {
@@ -371,17 +374,17 @@ macro_rules! read_event_impl {
                             // - event contains only spaces
                             // - trim_text_start = false
                             // - trim_text_end = true
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text($self.state.emit_text(start, bytes)?))
                         }
                         ReadTextResult::UpToRef(bytes) => {
                             $self.state.state = ParseState::InsideRef;
                             // Return Text event with `bytes` content or Eof if bytes is empty
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text($self.state.emit_text(start, bytes)?))
                         }
                         ReadTextResult::UpToEof(bytes) => {
                             $self.state.state = ParseState::Done;
                             // Trim bytes from end if required
-                            let event = $self.state.emit_text(bytes)?;
+                            let event = $self.state.emit_text(start, bytes)?;
                             if event.is_empty() {
                                 Ok(Event::Eof)
                             } else {
@@ -393,7 +396,7 @@ macro_rules! read_event_impl {
                 },
                 // Go to InsideText state in next two arms
                 ParseState::InsideMarkup => $self.$read_until_close($buf) $(.$await)?,
-                ParseState::InsideEmpty => Ok(Event::End($self.state.close_expanded_empty())),
+                ParseState::InsideEmpty(start) => Ok(Event::End($self.state.close_expanded_empty(start))),
                 ParseState::Done => Ok(Event::Eof),
             };
         };
@@ -443,7 +446,7 @@ macro_rules! read_until_close {
                 .read_bang_element($buf, &mut $self.state.offset)
                 $(.$await)?
             {
-                Ok((bang_type, bytes)) => $self.state.emit_bang(bang_type, bytes),
+                Ok((bang_type, bytes)) => $self.state.emit_bang(bang_type, start, bytes),
                 Err(e) => {
                     // We want to report error at `<`
                     $self.state.last_error_offset = start;
@@ -464,7 +467,7 @@ macro_rules! read_until_close {
                 .read_with(ElementParser::Outside, $buf, &mut $self.state.offset)
                 $(.$await)?
             {
-                Ok(bytes) => $self.state.emit_end(bytes),
+                Ok(bytes) => $self.state.emit_end(start, bytes),
                 Err(e) => {
                     // We want to report error at `<`
                     $self.state.last_error_offset = start;
@@ -476,7 +479,7 @@ macro_rules! read_until_close {
                 .read_with(PiParser(false), $buf, &mut $self.state.offset)
                 $(.$await)?
             {
-                Ok(bytes) => $self.state.emit_question_mark(bytes),
+                Ok(bytes) => $self.state.emit_question_mark(start, bytes),
                 Err(e) => {
                     // We want to report error at `<`
                     $self.state.last_error_offset = start;
@@ -488,7 +491,7 @@ macro_rules! read_until_close {
                 .read_with(ElementParser::Outside, $buf, &mut $self.state.offset)
                 $(.$await)?
             {
-                Ok(bytes) => $self.state.emit_start(bytes),
+                Ok(bytes) => $self.state.emit_start(start, bytes),
                 Err(e) => {
                     // We want to report error at `<`
                     $self.state.last_error_offset = start;
@@ -619,8 +622,10 @@ enum ParseState {
     /// [`Event::Start`] event. The next event emitted will be an [`Event::End`],
     /// after which reader returned to the `InsideText` state.
     ///
+    /// Contains start offset of the buffer, used to close empty tags
+    ///
     /// [`expand_empty_elements`]: Config::expand_empty_elements
-    InsideEmpty,
+    InsideEmpty(u64),
     /// Reader enters this state when `Eof` event generated or an error occurred.
     /// This is the last state, the reader stay in it forever.
     Done,
@@ -2087,6 +2092,8 @@ mod test {
             /// Ensures, that no empty `Text` events are generated
             mod $read_event {
                 use crate::events::{BytesCData, BytesComment, BytesDecl, BytesEnd, BytesPI, BytesStart, BytesText, Event};
+                #[cfg(feature = "span")]
+                use crate::events::Spanned;
                 use crate::reader::Reader;
                 use pretty_assertions::assert_eq;
 
@@ -2099,9 +2106,13 @@ mod test {
                 $($async)? fn bom_from_reader() {
                     let mut reader = Reader::from_reader("\u{feff}\u{feff}".as_bytes());
 
+                    let expected = BytesText::from_escaped("\u{feff}");
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..3);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::Text(BytesText::from_escaped("\u{feff}"))
+                        Event::Text(expected)
                     );
 
                     assert_eq!(
@@ -2119,9 +2130,13 @@ mod test {
                 $($async)? fn bom_from_str() {
                     let mut reader = Reader::from_str("\u{feff}\u{feff}");
 
+                    let expected = BytesText::from_escaped("\u{feff}");
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..3);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::Text(BytesText::from_escaped("\u{feff}"))
+                        Event::Text(expected)
                     );
 
                     assert_eq!(
@@ -2134,9 +2149,14 @@ mod test {
                 $($async)? fn declaration() {
                     let mut reader = Reader::from_str("<?xml ?>");
 
+                    let expected = BytesDecl::from_start(BytesStart::from_content("xml ", 3));
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..8);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::Decl(BytesDecl::from_start(BytesStart::from_content("xml ", 3)))
+                        Event::Decl(expected)
                     );
                 }
 
@@ -2144,9 +2164,14 @@ mod test {
                 $($async)? fn doctype() {
                     let mut reader = Reader::from_str("<!DOCTYPE x>");
 
+                    let expected = BytesText::from_escaped("x");
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..12);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::DocType(BytesText::from_escaped("x"))
+                        Event::DocType(expected)
                     );
                 }
 
@@ -2154,9 +2179,14 @@ mod test {
                 $($async)? fn processing_instruction() {
                     let mut reader = Reader::from_str("<?xml-stylesheet '? >\" ?>");
 
+                    let expected = BytesPI::new("xml-stylesheet '? >\" ");
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..25);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::PI(BytesPI::new("xml-stylesheet '? >\" "))
+                        Event::PI(expected)
                     );
                 }
 
@@ -2165,14 +2195,24 @@ mod test {
                 $($async)? fn start_and_end() {
                     let mut reader = Reader::from_str("<tag></tag>");
 
-                    assert_eq!(
-                        reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::Start(BytesStart::new("tag"))
-                    );
+                    let expected = BytesStart::new("tag");
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..5);
 
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::End(BytesEnd::new("tag"))
+                        Event::Start(expected)
+                    );
+
+                    let expected = BytesEnd::new("tag");
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(5..11);
+
+                    assert_eq!(
+                        reader.$read_event($buf) $(.$await)? .unwrap(),
+                        Event::End(expected)
                     );
                 }
 
@@ -2180,9 +2220,14 @@ mod test {
                 $($async)? fn empty() {
                     let mut reader = Reader::from_str("<tag/>");
 
+                    let expected = BytesStart::new("tag");
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..6);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::Empty(BytesStart::new("tag"))
+                        Event::Empty(expected)
                     );
                 }
 
@@ -2190,9 +2235,14 @@ mod test {
                 $($async)? fn text() {
                     let mut reader = Reader::from_str("text");
 
+                    let expected = BytesText::from_escaped("text");
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..4);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::Text(BytesText::from_escaped("text"))
+                        Event::Text(expected)
                     );
                 }
 
@@ -2200,9 +2250,14 @@ mod test {
                 $($async)? fn cdata() {
                     let mut reader = Reader::from_str("<![CDATA[]]>");
 
+                    let expected = BytesCData::new("");
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..12);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::CData(BytesCData::new(""))
+                        Event::CData(expected)
                     );
                 }
 
@@ -2210,9 +2265,14 @@ mod test {
                 $($async)? fn comment() {
                     let mut reader = Reader::from_str("<!---->");
 
+                    let expected = BytesComment::new("").unwrap();
+
+                    #[cfg(feature = "span")]
+                    let expected = expected.with_span(0..7);
+
                     assert_eq!(
                         reader.$read_event($buf) $(.$await)? .unwrap(),
-                        Event::Comment(BytesComment::new("").unwrap())
+                        Event::Comment(expected)
                     );
                 }
 
