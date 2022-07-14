@@ -131,9 +131,9 @@ macro_rules! configure_methods {
 }
 
 macro_rules! impl_buffered_source {
-    () => {
+    ($($lf:lifetime, $reader:ident, $async:ident, $await:ident)?) => {
         #[inline]
-        fn read_bytes_until(
+        $($async)? fn read_bytes_until $(<$lf>)? (
             &mut self,
             byte: u8,
             buf: &'b mut Vec<u8>,
@@ -147,7 +147,7 @@ macro_rules! impl_buffered_source {
             let start = buf.len();
             while !done {
                 let used = {
-                    let available = match self.fill_buf() {
+                    let available = match self $(.$reader)? .fill_buf() $(.$await)? {
                         Ok(n) if n.is_empty() => break,
                         Ok(n) => n,
                         Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -169,7 +169,7 @@ macro_rules! impl_buffered_source {
                         }
                     }
                 };
-                self.consume(used);
+                self $(.$reader)? .consume(used);
                 read += used;
             }
             *position += read;
@@ -181,7 +181,7 @@ macro_rules! impl_buffered_source {
             }
         }
 
-        fn read_bang_element(
+        $($async)? fn read_bang_element $(<$lf>)? (
             &mut self,
             buf: &'b mut Vec<u8>,
             position: &mut usize,
@@ -191,12 +191,12 @@ macro_rules! impl_buffered_source {
             let start = buf.len();
             let mut read = 1;
             buf.push(b'!');
-            self.consume(1);
+            self $(.$reader)? .consume(1);
 
-            let bang_type = BangType::new(self.peek_one()?)?;
+            let bang_type = BangType::new(self.peek_one() $(.$await)? ?)?;
 
             loop {
-                match self.fill_buf() {
+                match self $(.$reader)? .fill_buf() $(.$await)? {
                     // Note: Do not update position, so the error points to
                     // somewhere sane rather than at the EOF
                     Ok(n) if n.is_empty() => return Err(bang_type.to_err()),
@@ -204,7 +204,7 @@ macro_rules! impl_buffered_source {
                         if let Some((consumed, used)) = bang_type.parse(available, read) {
                             buf.extend_from_slice(consumed);
 
-                            self.consume(used);
+                            self $(.$reader)? .consume(used);
                             read += used;
 
                             *position += read;
@@ -213,7 +213,7 @@ macro_rules! impl_buffered_source {
                             buf.extend_from_slice(available);
 
                             let used = available.len();
-                            self.consume(used);
+                            self $(.$reader)? .consume(used);
                             read += used;
                         }
                     }
@@ -233,7 +233,7 @@ macro_rules! impl_buffered_source {
         }
 
         #[inline]
-        fn read_element(
+        $($async)? fn read_element $(<$lf>)? (
             &mut self,
             buf: &'b mut Vec<u8>,
             position: &mut usize,
@@ -243,13 +243,13 @@ macro_rules! impl_buffered_source {
 
             let start = buf.len();
             loop {
-                match self.fill_buf() {
+                match self $(.$reader)? .fill_buf() $(.$await)? {
                     Ok(n) if n.is_empty() => break,
                     Ok(available) => {
                         if let Some((consumed, used)) = state.change(available) {
                             buf.extend_from_slice(consumed);
 
-                            self.consume(used);
+                            self $(.$reader)? .consume(used);
                             read += used;
 
                             *position += read;
@@ -258,7 +258,7 @@ macro_rules! impl_buffered_source {
                             buf.extend_from_slice(available);
 
                             let used = available.len();
-                            self.consume(used);
+                            self $(.$reader)? .consume(used);
                             read += used;
                         }
                     }
@@ -279,13 +279,13 @@ macro_rules! impl_buffered_source {
 
         /// Consume and discard all the whitespace until the next non-whitespace
         /// character or EOF.
-        fn skip_whitespace(&mut self, position: &mut usize) -> Result<()> {
+        $($async)? fn skip_whitespace(&mut self, position: &mut usize) -> Result<()> {
             loop {
-                break match self.fill_buf() {
+                break match self $(.$reader)? .fill_buf() $(.$await)? {
                     Ok(n) => {
                         let count = n.iter().position(|b| !is_whitespace(*b)).unwrap_or(n.len());
                         if count > 0 {
-                            self.consume(count);
+                            self $(.$reader)? .consume(count);
                             *position += count;
                             continue;
                         } else {
@@ -300,14 +300,14 @@ macro_rules! impl_buffered_source {
 
         /// Consume and discard one character if it matches the given byte. Return
         /// true if it matched.
-        fn skip_one(&mut self, byte: u8, position: &mut usize) -> Result<bool> {
+        $($async)? fn skip_one(&mut self, byte: u8, position: &mut usize) -> Result<bool> {
             // search byte must be within the ascii range
             debug_assert!(byte.is_ascii());
 
-            match self.peek_one()? {
+            match self.peek_one() $(.$await)? ? {
                 Some(b) if b == byte => {
                     *position += 1;
-                    self.consume(1);
+                    self $(.$reader)? .consume(1);
                     Ok(true)
                 }
                 _ => Ok(false),
@@ -316,9 +316,9 @@ macro_rules! impl_buffered_source {
 
         /// Return one character without consuming it, so that future `read_*` calls
         /// will still include it. On EOF, return None.
-        fn peek_one(&mut self) -> Result<Option<u8>> {
+        $($async)? fn peek_one(&mut self) -> Result<Option<u8>> {
             loop {
-                break match self.fill_buf() {
+                break match self $(.$reader)? .fill_buf() $(.$await)? {
                     Ok(n) if n.is_empty() => Ok(None),
                     Ok(n) => Ok(Some(n[0])),
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
@@ -442,10 +442,14 @@ macro_rules! read_until_close {
     }};
 }
 
+#[cfg(feature = "async-tokio")]
+mod async_reader;
 mod buffered_reader;
 mod ns_reader;
 mod slice_reader;
 
+#[cfg(feature = "async-tokio")]
+pub use async_reader::AsyncReader;
 pub use ns_reader::NsReader;
 
 /// Possible reader states. The state transition diagram (`true` and `false` shows
