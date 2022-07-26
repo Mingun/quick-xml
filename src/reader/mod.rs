@@ -1163,7 +1163,7 @@ mod test {
     macro_rules! check {
         (
             // constructor of the XML source on which internal functions will be called
-            $source:path,
+            $wrap:path,
             // constructor of the buffer to which read data will stored
             $buf:expr
         ) => {
@@ -1178,11 +1178,11 @@ mod test {
                 fn empty() {
                     let buf = $buf;
                     let mut position = 0;
-                    let mut input = b"".as_ref();
-                    //                ^= 0
+                    let mut input = $wrap(b"".as_ref());
+                    //                      ^= 0
 
                     assert_eq!(
-                        $source(input)
+                        input
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1197,11 +1197,11 @@ mod test {
                 fn non_existent() {
                     let buf = $buf;
                     let mut position = 0;
-                    let mut input = b"abcdef".as_ref();
-                    //                      ^= 6
+                    let mut input = $wrap(b"abcdef".as_ref());
+                    //                            ^= 6
 
                     assert_eq!(
-                        $source(input)
+                        input
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1217,11 +1217,11 @@ mod test {
                 fn at_the_start() {
                     let buf = $buf;
                     let mut position = 0;
-                    let mut input = b"*abcdef".as_ref();
-                    //                 ^= 1
+                    let mut input = $wrap(b"*abcdef".as_ref());
+                    //                       ^= 1
 
                     assert_eq!(
-                        $source(input)
+                        input
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1237,11 +1237,11 @@ mod test {
                 fn inside() {
                     let buf = $buf;
                     let mut position = 0;
-                    let mut input = b"abc*def".as_ref();
-                    //                    ^= 4
+                    let mut input = $wrap(b"abc*def".as_ref());
+                    //                          ^= 4
 
                     assert_eq!(
-                        $source(input)
+                        input
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1257,11 +1257,11 @@ mod test {
                 fn in_the_end() {
                     let buf = $buf;
                     let mut position = 0;
-                    let mut input = b"abcdef*".as_ref();
-                    //                       ^= 7
+                    let mut input = $wrap(b"abcdef*".as_ref());
+                    //                             ^= 7
 
                     assert_eq!(
-                        $source(input)
+                        input
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1289,10 +1289,10 @@ mod test {
                     fn not_properly_start() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"![]]>other content".as_ref();
-                        //                ^= 0
+                        let mut input = $wrap(b"![]]>other content".as_ref());
+                        //                      ^= 0
 
-                        match $source(input).read_bang_element(buf, &mut position) {
+                        match input.read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "CData" => {}
                             x => assert!(
                                 false,
@@ -1309,10 +1309,10 @@ mod test {
                     fn not_closed() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"![CDATA[other content".as_ref();
-                        //                ^= 0
+                        let mut input = $wrap(b"![CDATA[other content".as_ref());
+                        //                      ^= 0
 
-                        match $source(input).read_bang_element(buf, &mut position) {
+                        match input.read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "CData" => {}
                             x => assert!(
                                 false,
@@ -1328,11 +1328,11 @@ mod test {
                     fn empty() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"![CDATA[]]>other content".as_ref();
-                        //                           ^= 11
+                        let mut input = $wrap(b"![CDATA[]]>other content".as_ref());
+                        //                                 ^= 11
 
                         assert_eq!(
-                            $source(input)
+                            input
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1348,11 +1348,11 @@ mod test {
                     fn with_content() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"![CDATA[cdata]] ]>content]]>other content]]>".as_ref();
-                        //                                            ^= 28
+                        let mut input = $wrap(b"![CDATA[cdata]] ]>content]]>other content]]>".as_ref());
+                        //                                                  ^= 28
 
                         assert_eq!(
-                            $source(input)
+                            input
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1390,10 +1390,10 @@ mod test {
                     fn not_properly_start() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"!- -->other content".as_ref();
-                        //                ^= 0
+                        let mut input = $wrap(b"!- -->other content".as_ref());
+                        //                      ^= 0
 
-                        match $source(input).read_bang_element(buf, &mut position) {
+                        match input.read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1408,10 +1408,10 @@ mod test {
                     fn not_properly_end() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"!->other content".as_ref();
-                        //                ^= 0
+                        let mut input = $wrap(b"!->other content".as_ref());
+                        //                      ^= 0
 
-                        match $source(input).read_bang_element(buf, &mut position) {
+                        match input.read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1426,10 +1426,10 @@ mod test {
                     fn not_closed1() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"!--other content".as_ref();
-                        //                ^= 0
+                        let mut input = $wrap(b"!--other content".as_ref());
+                        //                      ^= 0
 
-                        match $source(input).read_bang_element(buf, &mut position) {
+                        match input.read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1444,10 +1444,10 @@ mod test {
                     fn not_closed2() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"!-->other content".as_ref();
-                        //                ^= 0
+                        let mut input = $wrap(b"!-->other content".as_ref());
+                        //                      ^= 0
 
-                        match $source(input).read_bang_element(buf, &mut position) {
+                        match input.read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1462,10 +1462,10 @@ mod test {
                     fn not_closed3() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"!--->other content".as_ref();
-                        //                ^= 0
+                        let mut input = $wrap(b"!--->other content".as_ref());
+                        //                      ^= 0
 
-                        match $source(input).read_bang_element(buf, &mut position) {
+                        match input.read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1480,11 +1480,11 @@ mod test {
                     fn empty() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"!---->other content".as_ref();
-                        //                      ^= 6
+                        let mut input = $wrap(b"!---->other content".as_ref());
+                        //                            ^= 6
 
                         assert_eq!(
-                            $source(input)
+                            input
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1497,11 +1497,11 @@ mod test {
                     fn with_content() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"!--->comment<--->other content".as_ref();
-                        //                                 ^= 17
+                        let mut input = $wrap(b"!--->comment<--->other content".as_ref());
+                        //                                       ^= 17
 
                         assert_eq!(
-                            $source(input)
+                            input
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1526,10 +1526,10 @@ mod test {
                         fn not_properly_start() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!D other content".as_ref();
-                            //                ^= 0
+                            let mut input = $wrap(b"!D other content".as_ref());
+                            //                      ^= 0
 
-                            match $source(input).read_bang_element(buf, &mut position) {
+                            match input.read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1544,10 +1544,10 @@ mod test {
                         fn without_space() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!DOCTYPEother content".as_ref();
-                            //                ^= 0
+                            let mut input = $wrap(b"!DOCTYPEother content".as_ref());
+                            //                      ^= 0
 
-                            match $source(input).read_bang_element(buf, &mut position) {
+                            match input.read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1562,11 +1562,11 @@ mod test {
                         fn empty() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!DOCTYPE>other content".as_ref();
-                            //                         ^= 9
+                            let mut input = $wrap(b"!DOCTYPE>other content".as_ref());
+                            //                               ^= 9
 
                             assert_eq!(
-                                $source(input)
+                                input
                                     .read_bang_element(buf, &mut position)
                                     .unwrap()
                                     .map(|(ty, data)| (ty, Bytes(data))),
@@ -1579,10 +1579,10 @@ mod test {
                         fn not_closed() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!DOCTYPE other content".as_ref();
-                            //                ^= 0
+                            let mut input = $wrap(b"!DOCTYPE other content".as_ref());
+                            //                      ^= 0
 
-                            match $source(input).read_bang_element(buf, &mut position) {
+                            match input.read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1605,10 +1605,10 @@ mod test {
                         fn not_properly_start() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!d other content".as_ref();
-                            //                ^= 0
+                            let mut input = $wrap(b"!d other content".as_ref());
+                            //                      ^= 0
 
-                            match $source(input).read_bang_element(buf, &mut position) {
+                            match input.read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1623,10 +1623,10 @@ mod test {
                         fn without_space() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!doctypeother content".as_ref();
-                            //                ^= 0
+                            let mut input = $wrap(b"!doctypeother content".as_ref());
+                            //                      ^= 0
 
-                            match $source(input).read_bang_element(buf, &mut position) {
+                            match input.read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1641,11 +1641,11 @@ mod test {
                         fn empty() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!doctype>other content".as_ref();
-                            //                         ^= 9
+                            let mut input = $wrap(b"!doctype>other content".as_ref());
+                            //                               ^= 9
 
                             assert_eq!(
-                                $source(input)
+                                input
                                     .read_bang_element(buf, &mut position)
                                     .unwrap()
                                     .map(|(ty, data)| (ty, Bytes(data))),
@@ -1658,10 +1658,10 @@ mod test {
                         fn not_closed() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"!doctype other content".as_ref();
-                            //                ^= 0
+                            let mut input = $wrap(b"!doctype other content".as_ref());
+                            //                      ^= 0
 
-                            match $source(input).read_bang_element(buf, &mut position) {
+                            match input.read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1685,10 +1685,10 @@ mod test {
                 fn empty() {
                     let buf = $buf;
                     let mut position = 0;
-                    let mut input = b"".as_ref();
-                    //                ^= 0
+                    let mut input = $wrap(b"".as_ref());
+                    //                      ^= 0
 
-                    assert_eq!($source(input).read_element(buf, &mut position).unwrap().map(Bytes), None);
+                    assert_eq!(input.read_element(buf, &mut position).unwrap().map(Bytes), None);
                     assert_eq!(position, 0);
                 }
 
@@ -1701,11 +1701,11 @@ mod test {
                     fn empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b">".as_ref();
-                        //                 ^= 1
+                        let mut input = $wrap(b">".as_ref());
+                        //                       ^= 1
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b""))
                         );
                         assert_eq!(position, 1);
@@ -1715,11 +1715,11 @@ mod test {
                     fn normal() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"tag>".as_ref();
-                        //                    ^= 4
+                        let mut input = $wrap(b"tag>".as_ref());
+                        //                          ^= 4
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b"tag"))
                         );
                         assert_eq!(position, 4);
@@ -1729,11 +1729,11 @@ mod test {
                     fn empty_ns_empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b":>".as_ref();
-                        //                  ^= 2
+                        let mut input = $wrap(b":>".as_ref());
+                        //                        ^= 2
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":"))
                         );
                         assert_eq!(position, 2);
@@ -1743,11 +1743,11 @@ mod test {
                     fn empty_ns() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b":tag>".as_ref();
-                        //                     ^= 5
+                        let mut input = $wrap(b":tag>".as_ref());
+                        //                           ^= 5
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":tag"))
                         );
                         assert_eq!(position, 5);
@@ -1757,11 +1757,11 @@ mod test {
                     fn with_attributes() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = br#"tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref();
-                        //                                                        ^= 38
+                        let mut input = $wrap(br#"tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref());
+                        //                                                              ^= 38
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(br#"tag  attr-1=">"  attr2  =  '>'  3attr"#))
                         );
                         assert_eq!(position, 38);
@@ -1777,11 +1777,11 @@ mod test {
                     fn empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"/>".as_ref();
-                        //                  ^= 2
+                        let mut input = $wrap(b"/>".as_ref());
+                        //                        ^= 2
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b"/"))
                         );
                         assert_eq!(position, 2);
@@ -1791,11 +1791,11 @@ mod test {
                     fn normal() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"tag/>".as_ref();
-                        //                     ^= 5
+                        let mut input = $wrap(b"tag/>".as_ref());
+                        //                           ^= 5
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b"tag/"))
                         );
                         assert_eq!(position, 5);
@@ -1805,11 +1805,11 @@ mod test {
                     fn empty_ns_empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b":/>".as_ref();
-                        //                   ^= 3
+                        let mut input = $wrap(b":/>".as_ref());
+                        //                         ^= 3
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":/"))
                         );
                         assert_eq!(position, 3);
@@ -1819,11 +1819,11 @@ mod test {
                     fn empty_ns() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b":tag/>".as_ref();
-                        //                      ^= 6
+                        let mut input = $wrap(b":tag/>".as_ref());
+                        //                            ^= 6
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":tag/"))
                         );
                         assert_eq!(position, 6);
@@ -1833,11 +1833,11 @@ mod test {
                     fn with_attributes() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = br#"tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#.as_ref();
-                        //                                                           ^= 41
+                        let mut input = $wrap(br#"tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#.as_ref());
+                        //                                                                 ^= 41
 
                         assert_eq!(
-                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
+                            input.read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(br#"tag  attr-1="/>"  attr2  =  '/>'  3attr/"#))
                         );
                         assert_eq!(position, 41);
