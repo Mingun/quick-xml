@@ -145,3 +145,20 @@ impl<R: AsyncBufRead + Unpin> Reader<AsyncReader<R>> {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::AsyncReader;
+    use crate::reader::test::check;
+
+    fn wrap<R>(input: R) -> AsyncReader<R> {
+        AsyncReader { reader: input }
+    }
+
+    check!(
+        #[tokio::test]
+        wrap,
+        &mut Vec::new(),
+        async, await
+    );
+}
