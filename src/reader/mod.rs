@@ -1163,7 +1163,7 @@ mod test {
     macro_rules! check {
         ($buf:expr) => {
             mod read_bytes_until {
-                use crate::reader::XmlSource;
+                use super::*;
                 // Use Bytes for printing bytes as strings for ASCII range
                 use crate::utils::Bytes;
                 use pretty_assertions::assert_eq;
@@ -1267,10 +1267,13 @@ mod test {
             }
 
             mod read_bang_element {
+                use super::*;
+
                 /// Checks that reading CDATA content works correctly
                 mod cdata {
+                    use super::*;
                     use crate::errors::Error;
-                    use crate::reader::{BangType, XmlSource};
+                    use crate::reader::BangType;
                     use crate::utils::Bytes;
                     use pretty_assertions::assert_eq;
 
@@ -1371,8 +1374,9 @@ mod test {
                 ///
                 /// [specification]: https://www.w3.org/TR/xml11/#dt-comment
                 mod comment {
+                    use super::*;
                     use crate::errors::Error;
-                    use crate::reader::{BangType, XmlSource};
+                    use crate::reader::BangType;
                     use crate::utils::Bytes;
                     use pretty_assertions::assert_eq;
 
@@ -1504,9 +1508,12 @@ mod test {
 
                 /// Checks that reading DOCTYPE definition works correctly
                 mod doctype {
+                    use super::*;
+
                     mod uppercase {
+                        use super::*;
                         use crate::errors::Error;
-                        use crate::reader::{BangType, XmlSource};
+                        use crate::reader::BangType;
                         use crate::utils::Bytes;
                         use pretty_assertions::assert_eq;
 
@@ -1583,8 +1590,9 @@ mod test {
                     }
 
                     mod lowercase {
+                        use super::*;
                         use crate::errors::Error;
-                        use crate::reader::{BangType, XmlSource};
+                        use crate::reader::BangType;
                         use crate::utils::Bytes;
                         use pretty_assertions::assert_eq;
 
@@ -1663,7 +1671,7 @@ mod test {
             }
 
             mod read_element {
-                use crate::reader::XmlSource;
+                use super::*;
                 use crate::utils::Bytes;
                 use pretty_assertions::assert_eq;
 
@@ -1680,7 +1688,7 @@ mod test {
                 }
 
                 mod open {
-                    use crate::reader::XmlSource;
+                    use super::*;
                     use crate::utils::Bytes;
                     use pretty_assertions::assert_eq;
 
@@ -1756,7 +1764,7 @@ mod test {
                 }
 
                 mod self_closed {
-                    use crate::reader::XmlSource;
+                    use super::*;
                     use crate::utils::Bytes;
                     use pretty_assertions::assert_eq;
 
@@ -2026,11 +2034,15 @@ mod test {
 
     /// Tests for reader that generates events that borrow from the provided buffer
     mod buffered {
+        use crate::reader::XmlSource;
+
         check!(&mut Vec::new());
     }
 
     /// Tests for reader that generates events that borrow from the input
     mod borrowed {
+        use crate::reader::XmlSource;
+
         check!(());
     }
 }
