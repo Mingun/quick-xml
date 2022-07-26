@@ -1161,7 +1161,12 @@ pub(crate) fn is_whitespace(b: u8) -> bool {
 #[cfg(test)]
 mod test {
     macro_rules! check {
-        ($buf:expr) => {
+        (
+            // constructor of the XML source on which internal functions will be called
+            $source:path,
+            // constructor of the buffer to which read data will stored
+            $buf:expr
+        ) => {
             mod read_bytes_until {
                 use super::*;
                 // Use Bytes for printing bytes as strings for ASCII range
@@ -1177,7 +1182,7 @@ mod test {
                     //                ^= 0
 
                     assert_eq!(
-                        input
+                        $source(input)
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1196,7 +1201,7 @@ mod test {
                     //                      ^= 6
 
                     assert_eq!(
-                        input
+                        $source(input)
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1216,7 +1221,7 @@ mod test {
                     //                 ^= 1
 
                     assert_eq!(
-                        input
+                        $source(input)
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1236,7 +1241,7 @@ mod test {
                     //                    ^= 4
 
                     assert_eq!(
-                        input
+                        $source(input)
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1256,7 +1261,7 @@ mod test {
                     //                       ^= 7
 
                     assert_eq!(
-                        input
+                        $source(input)
                             .read_bytes_until(b'*', buf, &mut position)
                             .unwrap()
                             .map(Bytes),
@@ -1287,7 +1292,7 @@ mod test {
                         let mut input = b"![]]>other content".as_ref();
                         //                ^= 0
 
-                        match input.read_bang_element(buf, &mut position) {
+                        match $source(input).read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "CData" => {}
                             x => assert!(
                                 false,
@@ -1307,7 +1312,7 @@ mod test {
                         let mut input = b"![CDATA[other content".as_ref();
                         //                ^= 0
 
-                        match input.read_bang_element(buf, &mut position) {
+                        match $source(input).read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "CData" => {}
                             x => assert!(
                                 false,
@@ -1327,7 +1332,7 @@ mod test {
                         //                           ^= 11
 
                         assert_eq!(
-                            input
+                            $source(input)
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1347,7 +1352,7 @@ mod test {
                         //                                            ^= 28
 
                         assert_eq!(
-                            input
+                            $source(input)
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1388,7 +1393,7 @@ mod test {
                         let mut input = b"!- -->other content".as_ref();
                         //                ^= 0
 
-                        match input.read_bang_element(buf, &mut position) {
+                        match $source(input).read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1406,7 +1411,7 @@ mod test {
                         let mut input = b"!->other content".as_ref();
                         //                ^= 0
 
-                        match input.read_bang_element(buf, &mut position) {
+                        match $source(input).read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1424,7 +1429,7 @@ mod test {
                         let mut input = b"!--other content".as_ref();
                         //                ^= 0
 
-                        match input.read_bang_element(buf, &mut position) {
+                        match $source(input).read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1442,7 +1447,7 @@ mod test {
                         let mut input = b"!-->other content".as_ref();
                         //                ^= 0
 
-                        match input.read_bang_element(buf, &mut position) {
+                        match $source(input).read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1460,7 +1465,7 @@ mod test {
                         let mut input = b"!--->other content".as_ref();
                         //                ^= 0
 
-                        match input.read_bang_element(buf, &mut position) {
+                        match $source(input).read_bang_element(buf, &mut position) {
                             Err(Error::UnexpectedEof(s)) if s == "Comment" => {}
                             x => assert!(
                                 false,
@@ -1479,7 +1484,7 @@ mod test {
                         //                      ^= 6
 
                         assert_eq!(
-                            input
+                            $source(input)
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1496,7 +1501,7 @@ mod test {
                         //                                 ^= 17
 
                         assert_eq!(
-                            input
+                            $source(input)
                                 .read_bang_element(buf, &mut position)
                                 .unwrap()
                                 .map(|(ty, data)| (ty, Bytes(data))),
@@ -1524,7 +1529,7 @@ mod test {
                             let mut input = b"!D other content".as_ref();
                             //                ^= 0
 
-                            match input.read_bang_element(buf, &mut position) {
+                            match $source(input).read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1542,7 +1547,7 @@ mod test {
                             let mut input = b"!DOCTYPEother content".as_ref();
                             //                ^= 0
 
-                            match input.read_bang_element(buf, &mut position) {
+                            match $source(input).read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1561,7 +1566,7 @@ mod test {
                             //                         ^= 9
 
                             assert_eq!(
-                                input
+                                $source(input)
                                     .read_bang_element(buf, &mut position)
                                     .unwrap()
                                     .map(|(ty, data)| (ty, Bytes(data))),
@@ -1577,7 +1582,7 @@ mod test {
                             let mut input = b"!DOCTYPE other content".as_ref();
                             //                ^= 0
 
-                            match input.read_bang_element(buf, &mut position) {
+                            match $source(input).read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1603,7 +1608,7 @@ mod test {
                             let mut input = b"!d other content".as_ref();
                             //                ^= 0
 
-                            match input.read_bang_element(buf, &mut position) {
+                            match $source(input).read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1621,7 +1626,7 @@ mod test {
                             let mut input = b"!doctypeother content".as_ref();
                             //                ^= 0
 
-                            match input.read_bang_element(buf, &mut position) {
+                            match $source(input).read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1640,7 +1645,7 @@ mod test {
                             //                         ^= 9
 
                             assert_eq!(
-                                input
+                                $source(input)
                                     .read_bang_element(buf, &mut position)
                                     .unwrap()
                                     .map(|(ty, data)| (ty, Bytes(data))),
@@ -1656,7 +1661,7 @@ mod test {
                             let mut input = b"!doctype other content".as_ref();
                             //                ^= 0
 
-                            match input.read_bang_element(buf, &mut position) {
+                            match $source(input).read_bang_element(buf, &mut position) {
                                 Err(Error::UnexpectedEof(s)) if s == "DOCTYPE" => {}
                                 x => assert!(
                                     false,
@@ -1683,7 +1688,7 @@ mod test {
                     let mut input = b"".as_ref();
                     //                ^= 0
 
-                    assert_eq!(input.read_element(buf, &mut position).unwrap().map(Bytes), None);
+                    assert_eq!($source(input).read_element(buf, &mut position).unwrap().map(Bytes), None);
                     assert_eq!(position, 0);
                 }
 
@@ -1700,7 +1705,7 @@ mod test {
                         //                 ^= 1
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b""))
                         );
                         assert_eq!(position, 1);
@@ -1714,7 +1719,7 @@ mod test {
                         //                    ^= 4
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b"tag"))
                         );
                         assert_eq!(position, 4);
@@ -1728,7 +1733,7 @@ mod test {
                         //                  ^= 2
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":"))
                         );
                         assert_eq!(position, 2);
@@ -1742,7 +1747,7 @@ mod test {
                         //                     ^= 5
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":tag"))
                         );
                         assert_eq!(position, 5);
@@ -1756,7 +1761,7 @@ mod test {
                         //                                                        ^= 38
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(br#"tag  attr-1=">"  attr2  =  '>'  3attr"#))
                         );
                         assert_eq!(position, 38);
@@ -1776,7 +1781,7 @@ mod test {
                         //                  ^= 2
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b"/"))
                         );
                         assert_eq!(position, 2);
@@ -1790,7 +1795,7 @@ mod test {
                         //                     ^= 5
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b"tag/"))
                         );
                         assert_eq!(position, 5);
@@ -1804,7 +1809,7 @@ mod test {
                         //                   ^= 3
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":/"))
                         );
                         assert_eq!(position, 3);
@@ -1818,7 +1823,7 @@ mod test {
                         //                      ^= 6
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(b":tag/"))
                         );
                         assert_eq!(position, 6);
@@ -1832,7 +1837,7 @@ mod test {
                         //                                                           ^= 41
 
                         assert_eq!(
-                            input.read_element(buf, &mut position).unwrap().map(Bytes),
+                            $source(input).read_element(buf, &mut position).unwrap().map(Bytes),
                             Some(Bytes(br#"tag  attr-1="/>"  attr2  =  '/>'  3attr/"#))
                         );
                         assert_eq!(position, 41);
@@ -2032,17 +2037,24 @@ mod test {
         };
     }
 
+    /// Default buffer constructor just pass the byte array from the test
+    fn identity<T>(input: T) -> T {
+        input
+    }
+
     /// Tests for reader that generates events that borrow from the provided buffer
     mod buffered {
+        use super::identity;
         use crate::reader::XmlSource;
 
-        check!(&mut Vec::new());
+        check!(identity, &mut Vec::new());
     }
 
     /// Tests for reader that generates events that borrow from the input
     mod borrowed {
+        use super::identity;
         use crate::reader::XmlSource;
 
-        check!(());
+        check!(identity, ());
     }
 }
