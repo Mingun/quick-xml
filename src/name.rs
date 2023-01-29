@@ -250,7 +250,7 @@ impl<'a> Namespace<'a> {
     /// This is because XML entity references are expanded during attribute value
     /// normalization.
     ///
-    /// [non-normalized]: https://www.w3.org/TR/REC-xml/#AVNormalize
+    /// [non-normalized]: https://www.w3.org/TR/xml11/#AVNormalize
     /// [IRI reference]: https://datatracker.ietf.org/doc/html/rfc3987
     #[inline(always)]
     pub fn into_inner(self) -> &'a [u8] {
