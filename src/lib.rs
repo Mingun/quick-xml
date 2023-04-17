@@ -53,6 +53,7 @@
 
 #[cfg(feature = "serialize")]
 pub mod de;
+pub mod dom;
 pub mod encoding;
 pub mod errors;
 mod escapei;
