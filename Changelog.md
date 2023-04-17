@@ -102,6 +102,7 @@ automatically.
   methods which returns XML EOL normalized strings.
 - [#806]: Add `BytesText::html_content`, `BytesCData::html_content` and `BytesRef::html_content`
   methods which returns HTML EOL normalized strings.
+- [#851]: Implement DOM handling. See new types in `quick_xml::reader::dom` module.
 
 ### Bug Fixes
 
@@ -110,6 +111,7 @@ automatically.
   list of values and attribute requires decoding.
 
 [#806]: https://github.com/tafia/quick-xml/issues/806
+[#851]: https://github.com/tafia/quick-xml/issues/851
 [#878]: https://github.com/tafia/quick-xml/pull/878
 [#882]: https://github.com/tafia/quick-xml/pull/882
 [#888]: https://github.com/tafia/quick-xml/pull/888
