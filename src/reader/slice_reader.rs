@@ -15,6 +15,7 @@ use crate::events::Event;
 use crate::name::QName;
 use crate::parser::Parser;
 use crate::reader::{BangType, ReadTextResult, Reader, Span, XmlSource};
+use crate::reader::dom::{DomError, Element};
 use crate::utils::is_whitespace;
 
 /// This is an implementation for reading from a `&[u8]` as underlying byte stream.
@@ -234,6 +235,52 @@ impl<'a> Reader<&'a [u8]> {
         // SAFETY: `span` can only contain indexes up to usize::MAX because it
         // was created from offsets from a single &[u8] slice
         Ok(self.decoder().decode(&buffer[0..len as usize])?)
+    }
+
+    /// Creates a DOM Element by reading one node from a reader.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use pretty_assertions::assert_eq;
+    /// use quick_xml::events::{BytesStart, BytesText, Event};
+    /// use quick_xml::reader::Reader;
+    /// use quick_xml::reader::dom::{Element, Node};
+    ///
+    /// let mut reader = Reader::from_str(r#"
+    ///     <root>
+    ///         <field>data</field>
+    ///         text <![CDATA[merged with CDATA]] &lt;:)
+    ///     </root>
+    /// "#);
+    /// reader.config_mut().trim_text(true);
+    ///
+    /// let start = BytesStart::new("root");
+    /// let end   = start.to_end().into_owned();
+    ///
+    /// // Read `<root>`
+    /// assert_eq!(reader.read_event().unwrap(), Event::Start(start));
+    ///
+    /// let node = reader.read_node().unwrap();
+    /// /*assert_eq!(
+    ///     node,
+    ///     Element {
+    ///         start: BytesStart::new("field"),
+    ///         children: vec![Node::Text("data".into())],
+    ///     }
+    /// );*/
+    ///
+    /// // Read `text`
+    /// let node = reader.read_node().unwrap();
+    ///
+    /// // Read `</root>`
+    /// assert_eq!(reader.read_event().unwrap(), Event::End(end));
+    ///
+    /// // At the end we should get an Eof event, because we ate the whole XML
+    /// assert_eq!(reader.read_event().unwrap(), Event::Eof);
+    /// ```
+    pub fn read_node(&mut self) -> std::result::Result<Element<'a>, DomError> {
+        Element::read_element(self)
     }
 }
 
