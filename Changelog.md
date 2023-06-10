@@ -18,10 +18,14 @@
 
 ### Bug Fixes
 
+- [#597]: Fix incorrect processing of namespace scopes in `NsReader::read_to_end`
+  `NsReader::read_to_end_into`, `NsReader::read_to_end_into_async` and `NsReader::read_text`.
+  The scope started by a start element was not ended after that call.
 - [#936]: Fix incorrect result of `.read_text()` when it is called after reading `Text` or `GeneralRef` event.
 
 ### Misc Changes
 
+[#597]: https://github.com/tafia/quick-xml/issues/597
 [#936]: https://github.com/tafia/quick-xml/pull/936
 
 
