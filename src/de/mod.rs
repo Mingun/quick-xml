@@ -1989,6 +1989,7 @@ macro_rules! deserialize_primitives {
     };
 }
 
+pub mod dom;
 mod key;
 mod map;
 mod resolver;

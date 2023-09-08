@@ -58,8 +58,8 @@ enum Unprocessed<'a> {
 /// A struct representing a DOM Element.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Element<'a> {
-    start: BytesStart<'a>,
-    children: Vec<Node<'a>>,
+    pub(crate) start: BytesStart<'a>,
+    pub(crate) children: Vec<Node<'a>>,
 }
 impl<'a> Element<'a> {
     /// Creates a DOM Element from XML text, borrowing the input.
