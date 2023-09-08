@@ -58,8 +58,8 @@ enum Unprocessed<'a> {
 /// A struct representing a DOM Element.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Element<'a> {
-    start: BytesStart<'a>,
-    children: Vec<Node<'a>>,
+    pub(crate) start: BytesStart<'a>,
+    pub(crate) children: Vec<Node<'a>>,
 }
 impl<'a> Element<'a> {
     /// Creates a DOM Element from XML text, borrowing the input.
@@ -87,7 +87,10 @@ impl<'a> Element<'a> {
                 }
                 Event::Empty(e) => (Unprocessed::Empty(e), true),
                 Event::Text(e) => (Unprocessed::Text(e.unescape()?), false),
-                Event::CData(e) => (Unprocessed::Text(e.decode().map_err(|e| Error::Encoding(e))?), false),
+                Event::CData(e) => (
+                    Unprocessed::Text(e.decode().map_err(|e| Error::Encoding(e))?),
+                    false,
+                ),
 
                 Event::Eof => break,
             };
@@ -285,9 +288,6 @@ mod tests {
     #[test]
     fn missing_open_tag() {
         let error = Element::from_str("</close>").unwrap_err();
-        assert!(matches!(
-            error,
-            DomError::Parse(Error::IllFormed(_))
-        ));
+        assert!(matches!(error, DomError::Parse(Error::IllFormed(_))));
     }
 }
