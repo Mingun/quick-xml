@@ -4,14 +4,15 @@ use crate::errors::Error;
 use crate::events::{BytesCData, BytesEnd, BytesStart, BytesText, Event};
 use crate::reader::Reader;
 use std::borrow::Cow;
+use std::collections::VecDeque;
 use std::fmt;
 use std::io::BufRead;
 
 /// A struct representing a DOM Element.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Element<'i> {
-    start: BytesStart<'i>,
-    children: Vec<Node<'i>>,
+    pub(crate) start: BytesStart<'i>,
+    pub(crate) children: VecDeque<Node<'i>>,
 }
 impl<'i> Element<'i> {
     /// Parses specified XML string returning result as a single DOM Element.
@@ -131,11 +132,6 @@ impl<'i> Element<'i> {
         &self.start
     }
 
-    /// Returns the list of child nodes
-    pub fn children(&self) -> &[Node<'i>] {
-        &self.children
-    }
-
     /// Ensures that all data is owned to extend the object's lifetime if necessary.
     pub fn into_owned(self) -> Element<'static> {
         Element {
@@ -149,7 +145,7 @@ impl<'i> From<BytesStart<'i>> for Element<'i> {
     fn from(tag: BytesStart<'i>) -> Self {
         Self {
             start: tag,
-            children: Vec::new(),
+            children: VecDeque::new(),
         }
     }
 }
@@ -497,7 +493,7 @@ impl<'i> DomBuilder<'i> {
         if create_text_node {
             if let Some(text) = self.text.take() {
                 match self.parents.last_mut() {
-                    Some(parent) => parent.children.push(Node::from(text)),
+                    Some(parent) => parent.children.push_back(Node::from(text)),
                     None => return Ok(FeedResult::Text(text, unprocessed.into_event())),
                 }
             }
@@ -508,7 +504,7 @@ impl<'i> DomBuilder<'i> {
             // Matching to start event already checked in a parser
             Unprocessed::End(_) => match self.parents.pop() {
                 Some(element) => match self.parents.last_mut() {
-                    Some(parent) => parent.children.push(Node::from(element)),
+                    Some(parent) => parent.children.push_back(Node::from(element)),
                     // Reader is guarantee that nesting is correct, so when parents become empty
                     // we have finished reading the element tree
                     None => return Ok(FeedResult::Element(element)),
@@ -523,7 +519,7 @@ impl<'i> DomBuilder<'i> {
             Unprocessed::Empty(e) => {
                 let element = Element::from(e);
                 match self.parents.last_mut() {
-                    Some(parent) => parent.children.push(Node::from(element)),
+                    Some(parent) => parent.children.push_back(Node::from(element)),
                     None => return Ok(FeedResult::Element(element)),
                 }
             }
