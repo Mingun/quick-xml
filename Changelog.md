@@ -33,6 +33,9 @@ to get an offset of the error position. For `SyntaxError`s the range
 - [#629]: Added a default case to `impl_deserialize_for_internally_tagged_enum` macro so that
   it can handle every attribute that does not match existing cases within an enum variant.
 - [#722]: Allow to pass owned strings to `Writer::create_element`. This is breaking change!
+- [#743]: Add methods to convert serde Deserializer into XML Reader:
+  - `Deserializer::get_ref()`
+  - `Deserializer::into_inner()`
 
 ### Bug Fixes
 
@@ -80,6 +83,7 @@ to get an offset of the error position. For `SyntaxError`s the range
 [#705]: https://github.com/tafia/quick-xml/pull/705
 [#722]: https://github.com/tafia/quick-xml/pull/722
 [#738]: https://github.com/tafia/quick-xml/pull/738
+[#743]: https://github.com/tafia/quick-xml/pull/743
 
 
 ## 0.31.0 -- 2023-10-22
