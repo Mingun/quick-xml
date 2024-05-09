@@ -247,3 +247,8 @@ path = "examples/read_nodes_serde.rs"
 name = "flattened_enum"
 required-features = ["serialize"]
 path = "examples/flattened_enum.rs"
+
+[[example]]
+name = "error_position_serde"
+required-features = ["serialize"]
+path = "examples/error_position_serde.rs"
