@@ -4686,4 +4686,63 @@ mod tests {
             }
         }
     }
+
+    mod inner {
+        use super::*;
+        use pretty_assertions::assert_eq;
+
+        #[test]
+        fn borrowed() {
+            let source = "<line1>\n  <line2>\n    <line3>\n    </line4>";
+
+            let mut de = make_de(source);
+
+            {
+                assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("line1")));
+                assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("line2")));
+                assert_eq!(de.get_ref().error_position(), 0);
+                assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("line3")));
+                assert!(de.next().is_err());
+            }
+
+            let reader: Reader<&[u8]> = de.into_inner();
+
+            let err_pos = reader.error_position();
+            let buf_pos = reader.buffer_position();
+            assert_eq!(err_pos, 34);
+            assert_eq!(buf_pos, 42);
+            assert_eq!(&source[err_pos..buf_pos], "</line4>");
+        }
+
+        #[test]
+        fn buffered() {
+            use std::io::Cursor;
+            let source = "<html>\n  <head>\n    <title>\n    </head><body><span>Body text should not be read";
+
+            dbg!(source);
+
+            let cursor = Cursor::new(source.as_bytes());
+            let mut de = Deserializer::from_reader(cursor);
+
+            {
+                assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("html")));
+                assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("head")));
+                assert_eq!(de.get_ref().error_position(), 0);
+                assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("title")));
+                assert!(de.next().is_err());
+            }
+
+            let reader: Reader<Cursor<&[u8]>> = de.into_inner();
+
+            let err_pos = reader.error_position();
+            let buf_pos = reader.buffer_position();
+            let cursor = reader.into_inner();
+            let cur_pos = cursor.position();
+
+            assert_eq!(err_pos, 32);
+            assert_eq!(buf_pos, 45);
+            assert_eq!(cur_pos, 45);
+            assert_eq!(&source[err_pos..buf_pos], "</head><body>");
+        }
+    }
 }
