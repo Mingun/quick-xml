@@ -2456,13 +2456,13 @@ where
     /// let err = SomeStruct::deserialize(&mut de);
     /// assert!(err.is_err());
     ///
-    /// let reader: &Reader<_> = de.get_ref().get_ref();
+    /// let reader: &Reader<_> = de.get_ref();
     ///
     /// assert_eq!(reader.error_position(), 28);
     /// assert_eq!(reader.buffer_position(), 41);
     /// ```
-    pub fn get_ref(&self) -> &R {
-        &self.reader.reader
+    pub fn get_ref(&self) -> &R::XmlReader {
+        self.reader.reader.get_ref()
     }
 
     /// Consumes this deserializer returning the underlying reader.
@@ -2489,13 +2489,13 @@ where
     ///
     /// let _ = SomeStruct::deserialize(&mut de);
     ///
-    /// let reader: Reader<_> = de.into_inner().into_inner();
+    /// let reader: Reader<_> = de.into_inner();
     ///
     /// assert_eq!(reader.error_position(), 28);
     /// assert_eq!(reader.buffer_position(), 41);
     /// ```
-    pub fn into_inner(self) -> R {
-        self.reader.reader
+    pub fn into_inner(self) -> R::XmlReader {
+        self.reader.reader.into_inner()
     }
 
     /// Set the maximum number of events that could be skipped during deserialization
@@ -3106,6 +3106,9 @@ impl Default for StartTrimmer {
 /// [borrowing](SliceReader) and [copying](IoReader) data sources and reuse code in
 /// deserializer
 pub trait XmlRead<'i> {
+    /// The XML reader used to read from this source.
+    type XmlReader;
+
     /// Return an input-borrowing event.
     fn next(&mut self) -> Result<PayloadEvent<'i>, DeError>;
 
@@ -3115,6 +3118,14 @@ pub trait XmlRead<'i> {
 
     /// A copy of the reader's decoder used to decode strings.
     fn decoder(&self) -> Decoder;
+
+    /// Gives the read-only access to the XML reader.
+    fn get_ref(&self) -> &Self::XmlReader;
+
+    /// Destructs the given reader adapter and returns the XML reader.
+    ///
+    /// This method is used to move from serde-based API to event-based API.
+    fn into_inner(self) -> Self::XmlReader;
 }
 
 /// XML input source that reads from a std::io input stream.
@@ -3127,75 +3138,9 @@ pub struct IoReader<R: BufRead> {
     buf: Vec<u8>,
 }
 
-impl<R: BufRead> IoReader<R> {
-    /// Returns the underlying XML reader.
-    ///
-    /// ```
-    /// # use pretty_assertions::assert_eq;
-    /// use serde::Deserialize;
-    /// use std::io::Cursor;
-    /// use quick_xml::de::Deserializer;
-    /// use quick_xml::Reader;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct SomeStruct {
-    ///     field1: String,
-    ///     field2: String,
-    /// }
-    ///
-    /// // Try to deserialize from broken XML
-    /// let mut de = Deserializer::from_reader(Cursor::new(
-    ///     "<SomeStruct><field1><field2></SomeStruct>"
-    /// //   0                           ^= 28        ^= 41
-    /// ));
-    ///
-    /// let err = SomeStruct::deserialize(&mut de);
-    /// assert!(err.is_err());
-    ///
-    /// let reader: &Reader<Cursor<&str>> = de.get_ref().get_ref();
-    ///
-    /// assert_eq!(reader.error_position(), 28);
-    /// assert_eq!(reader.buffer_position(), 41);
-    /// ```
-    pub fn get_ref(&self) -> &Reader<R> {
-        &self.reader
-    }
-
-    /// Consumes this `IoReader` returning the underlying XML reader.
-    /// Can be used to move from serde deserializer to event-based reader.
-    ///
-    /// ```
-    /// # use pretty_assertions::assert_eq;
-    /// use serde::Deserialize;
-    /// use std::io::Cursor;
-    /// use quick_xml::de::Deserializer;
-    /// use quick_xml::Reader;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct SomeStruct {
-    ///     field1: String,
-    ///     field2: String,
-    /// }
-    ///
-    /// // Try to deserialize from broken XML
-    /// let mut de = Deserializer::from_reader(Cursor::new(
-    ///     "<SomeStruct><field1><field2></SomeStruct>"
-    /// //   0                           ^= 28        ^= 41
-    /// ));
-    ///
-    /// let _ = SomeStruct::deserialize(&mut de);
-    ///
-    /// let reader: Reader<Cursor<&str>> = de.into_inner().into_inner();
-    ///
-    /// assert_eq!(reader.error_position(), 28);
-    /// assert_eq!(reader.buffer_position(), 41);
-    /// ```
-    pub fn into_inner(self) -> Reader<R> {
-        self.reader
-    }
-}
-
 impl<'i, R: BufRead> XmlRead<'i> for IoReader<R> {
+    type XmlReader = Reader<R>;
+
     fn next(&mut self) -> Result<PayloadEvent<'static>, DeError> {
         loop {
             self.buf.clear();
@@ -3217,6 +3162,14 @@ impl<'i, R: BufRead> XmlRead<'i> for IoReader<R> {
     fn decoder(&self) -> Decoder {
         self.reader.decoder()
     }
+
+    fn get_ref(&self) -> &Self::XmlReader {
+        &self.reader
+    }
+
+    fn into_inner(self) -> Self::XmlReader {
+        self.reader
+    }
 }
 
 /// XML input source that reads from a slice of bytes and can borrow from it.
@@ -3228,74 +3181,9 @@ pub struct SliceReader<'de> {
     start_trimmer: StartTrimmer,
 }
 
-impl<'de> SliceReader<'de> {
-    /// Returns the underlying XML reader.
-    ///
-    /// ```
-    /// # use pretty_assertions::assert_eq;
-    /// use serde::Deserialize;
-    /// use quick_xml::de::Deserializer;
-    /// use quick_xml::Reader;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct SomeStruct {
-    ///     field1: String,
-    ///     field2: String,
-    /// }
-    ///
-    /// // Try to deserialize from broken XML
-    /// let mut de = Deserializer::from_str(
-    ///     "<SomeStruct><field1><field2></SomeStruct>"
-    /// //   0                           ^= 28        ^= 41
-    /// );
-    ///
-    /// let err = SomeStruct::deserialize(&mut de);
-    /// assert!(err.is_err());
-    ///
-    /// let reader: &Reader<&[u8]> = de.get_ref().get_ref();
-    ///
-    /// assert_eq!(reader.error_position(), 28);
-    /// assert_eq!(reader.buffer_position(), 41);
-    /// ```
-    pub fn get_ref(&self) -> &Reader<&'de [u8]> {
-        &self.reader
-    }
-
-    /// Consumes this `SliceReader` returning the underlying reader.
-    /// Can be used to move from serde deserializer to event-based reader.
-    ///
-    /// ```
-    /// # use pretty_assertions::assert_eq;
-    /// use serde::Deserialize;
-    /// use quick_xml::de::Deserializer;
-    /// use quick_xml::Reader;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct SomeStruct {
-    ///     field1: String,
-    ///     field2: String,
-    /// }
-    ///
-    /// // Try to deserialize from broken XML
-    /// let mut de = Deserializer::from_str(
-    ///     "<SomeStruct><field1><field2></SomeStruct>"
-    /// //   0                           ^= 28        ^= 41
-    /// );
-    ///
-    /// let err = SomeStruct::deserialize(&mut de);
-    /// assert!(err.is_err());
-    ///
-    /// let reader: Reader<&[u8]> = de.into_inner().into_inner();
-    ///
-    /// assert_eq!(reader.error_position(), 28);
-    /// assert_eq!(reader.buffer_position(), 41);
-    /// ```
-    pub fn into_inner(self) -> Reader<&'de [u8]> {
-        self.reader
-    }
-}
-
 impl<'de> XmlRead<'de> for SliceReader<'de> {
+    type XmlReader = Reader<&'de [u8]>;
+
     fn next(&mut self) -> Result<PayloadEvent<'de>, DeError> {
         loop {
             let event = self.reader.read_event()?;
@@ -3314,6 +3202,14 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
 
     fn decoder(&self) -> Decoder {
         self.reader.decoder()
+    }
+
+    fn get_ref(&self) -> &Self::XmlReader {
+        &self.reader
+    }
+
+    fn into_inner(self) -> Self::XmlReader {
+        self.reader
     }
 }
 
