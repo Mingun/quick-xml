@@ -60,7 +60,7 @@ impl ReaderState {
     ///
     /// [`Text`]: Event::Text
     /// [`Eof`]: Event::Eof
-    pub fn emit_text<'b>(&mut self, bytes: &'b [u8]) -> Result<Event<'b>> {
+    pub fn emit_text<'b>(&mut self, bytes: &'b [u8]) -> Event<'b> {
         let mut content = bytes;
 
         if self.config.trim_text_end {
@@ -73,9 +73,9 @@ impl ReaderState {
         }
 
         if content.is_empty() {
-            Ok(Event::Eof)
+            Event::Eof
         } else {
-            Ok(Event::Text(BytesText::wrap(content, self.decoder())))
+            Event::Text(BytesText::wrap(content, self.decoder()))
         }
     }
 
@@ -257,7 +257,7 @@ impl ReaderState {
     ///
     /// # Parameters
     /// - `content`: Content of a tag between `<` and `>`
-    pub fn emit_start<'b>(&mut self, content: &'b [u8]) -> Result<Event<'b>> {
+    pub fn emit_start<'b>(&mut self, content: &'b [u8]) -> Event<'b> {
         let len = content.len();
         let name_end = content
             .iter()
@@ -272,9 +272,9 @@ impl ReaderState {
                 self.state = ParseState::InsideEmpty;
                 self.opened_starts.push(self.opened_buffer.len());
                 self.opened_buffer.extend(&content[..name_len]);
-                Ok(Event::Start(event))
+                Event::Start(event)
             } else {
-                Ok(Event::Empty(event))
+                Event::Empty(event)
             }
         } else {
             // #514: Always store names event when .check_end_names == false,
@@ -282,17 +282,17 @@ impl ReaderState {
             // enabled, we should have that information
             self.opened_starts.push(self.opened_buffer.len());
             self.opened_buffer.extend(&content[..name_end]);
-            Ok(Event::Start(BytesStart::wrap(content, name_end)))
+            Event::Start(BytesStart::wrap(content, name_end))
         }
     }
 
     #[inline]
-    pub fn close_expanded_empty(&mut self) -> Result<Event<'static>> {
+    pub fn close_expanded_empty(&mut self) -> BytesEnd<'static> {
         self.state = ParseState::InsideText;
         let name = self
             .opened_buffer
             .split_off(self.opened_starts.pop().unwrap());
-        Ok(Event::End(BytesEnd::wrap(name.into())))
+        BytesEnd::wrap(name.into())
     }
 
     /// Get the decoder, used to decode bytes, read by this reader, to the strings.
