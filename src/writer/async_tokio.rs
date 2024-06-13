@@ -26,12 +26,12 @@ impl<W: AsyncWrite + Unpin> Writer<W> {
                 self.write_wrapped_async(b"</", e, b">").await
             }
             Event::Empty(ref e) => self.write_wrapped_async(b"<", e, b"/>").await,
-            Event::Text(ref e) => {
+            Event::Text(ref e) | Event::TextChunk(ref e) => {
                 next_should_line_break = false;
                 self.write_async(e).await
             }
             Event::Comment(ref e) => self.write_wrapped_async(b"<!--", e, b"-->").await,
-            Event::CData(ref e) => {
+            Event::CData(ref e) | Event::CDataChunk(ref e) => {
                 next_should_line_break = false;
                 self.write_async(b"<![CDATA[").await?;
                 self.write_async(e).await?;

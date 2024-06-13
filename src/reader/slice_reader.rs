@@ -279,6 +279,11 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         }
     }
 
+    #[inline(always)]
+    fn read_text_chunk(&mut self, buf: (), position: &mut usize) -> ReadTextResult<'a, ()> {
+        self.read_text(buf, position)
+    }
+
     #[inline]
     fn read_bytes_until(
         &mut self,

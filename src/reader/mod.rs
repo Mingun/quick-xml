@@ -814,6 +814,7 @@ trait XmlSource<'r, B> {
     ///
     /// [events]: crate::events::Event
     fn read_text(&mut self, buf: B, position: &mut usize) -> ReadTextResult<'r, B>;
+    fn read_text_chunk(&mut self, buf: B, position: &mut usize) -> ReadTextResult<'r, B>;
 
     /// Read input until `byte` is found or end of input is reached.
     ///

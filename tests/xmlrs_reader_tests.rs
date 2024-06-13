@@ -386,6 +386,7 @@ fn test_bytes(input: &[u8], output: &[u8], trim: bool) {
             },
             Ok((_, Event::Eof)) => "EndDocument".to_string(),
             Err(e) => format!("Error: {}", e),
+            Ok((_, Event::TextChunk(_))) | Ok((_, Event::CDataChunk(_))) => todo!(),
         };
         if let Some((n, spec)) = spec_lines.next() {
             if spec.trim() == "EndDocument" {

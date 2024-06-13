@@ -54,47 +54,57 @@ macro_rules! impl_buffered_source {
             buf: &'b mut Vec<u8>,
             position: &mut usize,
         ) -> ReadTextResult<'b, &'b mut Vec<u8>> {
-            let mut read = 0;
             let start = buf.len();
             loop {
-                let available = match self $(.$reader)? .fill_buf() $(.$await)? {
-                    Ok(n) if n.is_empty() => break,
-                    Ok(n) => n,
-                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                    Err(e) => {
-                        *position += read;
-                        return ReadTextResult::Err(e);
-                    }
+                return match self.read_text_chunk(&mut *buf, position) $(.$await)? {
+                    ReadTextResult::Markup(_) => return ReadTextResult::Markup(buf),
+                    ReadTextResult::UpToMarkup(_) => ReadTextResult::UpToMarkup(&buf[start..]),
+                    ReadTextResult::UpToEof(n) if n.is_empty() => ReadTextResult::UpToEof(&buf[start..]),
+                    ReadTextResult::UpToEof(_) => continue,
+
+                    ReadTextResult::Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    ReadTextResult::Err(e) => ReadTextResult::Err(e),
                 };
+            }
+        }
 
-                match memchr::memchr(b'<', available) {
-                    Some(0) => {
-                        self $(.$reader)? .consume(1);
-                        *position += 1;
-                        return ReadTextResult::Markup(buf);
-                    }
-                    Some(i) => {
-                        buf.extend_from_slice(&available[..i]);
+        #[inline]
+        $($async)? fn read_text_chunk $(<$lf>)? (
+            &mut self,
+            buf: &'b mut Vec<u8>,
+            position: &mut usize,
+        ) -> ReadTextResult<'b, &'b mut Vec<u8>> {
+            let start = buf.len();
+            let available = match self $(.$reader)? .fill_buf() $(.$await)? {
+                Ok(n) => n,
+                Err(e) => return ReadTextResult::Err(e),
+            };
 
-                        let used = i + 1;
-                        self $(.$reader)? .consume(used);
-                        read += used;
+            match memchr::memchr(b'<', available) {
+                Some(0) => {
+                    self $(.$reader)? .consume(1);
+                    *position += 1;
+                    ReadTextResult::Markup(buf)
+                }
+                Some(i) => {
+                    buf.extend_from_slice(&available[..i]);
 
-                        *position += read;
-                        return ReadTextResult::UpToMarkup(&buf[start..]);
-                    }
-                    None => {
-                        buf.extend_from_slice(available);
+                    let used = i + 1;
+                    self $(.$reader)? .consume(used);
 
-                        let used = available.len();
-                        self $(.$reader)? .consume(used);
-                        read += used;
-                    }
+                    *position += used;
+                    ReadTextResult::UpToMarkup(&buf[start..])
+                }
+                None => {
+                    buf.extend_from_slice(available);
+
+                    let used = available.len();
+                    self $(.$reader)? .consume(used);
+
+                    *position += used;
+                    ReadTextResult::UpToEof(&buf[start..])
                 }
             }
-
-            *position += read;
-            ReadTextResult::UpToEof(&buf[start..])
         }
 
         #[inline]

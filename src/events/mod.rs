@@ -1006,8 +1006,12 @@ pub enum Event<'a> {
     Empty(BytesStart<'a>),
     /// Escaped character data between tags.
     Text(BytesText<'a>),
+    /// Escaped character data between tags.
+    TextChunk(BytesText<'a>),
     /// Unescaped character data stored in `<![CDATA[...]]>`.
     CData(BytesCData<'a>),
+    /// Unescaped character data stored in `<![CDATA[...]]>`.
+    CDataChunk(BytesCData<'a>),
     /// Comment `<!-- ... -->`.
     Comment(BytesText<'a>),
     /// XML declaration `<?xml ...?>`.
@@ -1029,8 +1033,10 @@ impl<'a> Event<'a> {
             Event::End(e) => Event::End(e.into_owned()),
             Event::Empty(e) => Event::Empty(e.into_owned()),
             Event::Text(e) => Event::Text(e.into_owned()),
+            Event::TextChunk(e) => Event::TextChunk(e.into_owned()),
             Event::Comment(e) => Event::Comment(e.into_owned()),
             Event::CData(e) => Event::CData(e.into_owned()),
+            Event::CDataChunk(e) => Event::CDataChunk(e.into_owned()),
             Event::Decl(e) => Event::Decl(e.into_owned()),
             Event::PI(e) => Event::PI(e.into_owned()),
             Event::DocType(e) => Event::DocType(e.into_owned()),
@@ -1046,8 +1052,10 @@ impl<'a> Event<'a> {
             Event::End(e) => Event::End(e.borrow()),
             Event::Empty(e) => Event::Empty(e.borrow()),
             Event::Text(e) => Event::Text(e.borrow()),
+            Event::TextChunk(e) => Event::TextChunk(e.borrow()),
             Event::Comment(e) => Event::Comment(e.borrow()),
             Event::CData(e) => Event::CData(e.borrow()),
+            Event::CDataChunk(e) => Event::CDataChunk(e.borrow()),
             Event::Decl(e) => Event::Decl(e.borrow()),
             Event::PI(e) => Event::PI(e.borrow()),
             Event::DocType(e) => Event::DocType(e.borrow()),
@@ -1064,9 +1072,11 @@ impl<'a> Deref for Event<'a> {
             Event::Start(ref e) | Event::Empty(ref e) => e,
             Event::End(ref e) => e,
             Event::Text(ref e) => e,
+            Event::TextChunk(ref e) => e,
             Event::Decl(ref e) => e,
             Event::PI(ref e) => e,
             Event::CData(ref e) => e,
+            Event::CDataChunk(ref e) => e,
             Event::Comment(ref e) => e,
             Event::DocType(ref e) => e,
             Event::Eof => &[],

@@ -210,12 +210,12 @@ impl<W: Write> Writer<W> {
                 self.write_wrapped(b"</", e, b">")
             }
             Event::Empty(ref e) => self.write_wrapped(b"<", e, b"/>"),
-            Event::Text(ref e) => {
+            Event::Text(ref e) | Event::TextChunk(ref e) => {
                 next_should_line_break = false;
                 self.write(e)
             }
             Event::Comment(ref e) => self.write_wrapped(b"<!--", e, b"-->"),
-            Event::CData(ref e) => {
+            Event::CData(ref e) | Event::CDataChunk(ref e) => {
                 next_should_line_break = false;
                 self.write(b"<![CDATA[")?;
                 self.write(e)?;
