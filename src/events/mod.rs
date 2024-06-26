@@ -230,6 +230,32 @@ impl<'a> BytesStart<'a> {
             Cow::Owned(ref o) => CowRef::Slice(&o[..self.name_len]),
         }
     }
+
+    /// Well-formedness constraints
+    /// ===========================
+    ///
+    /// [WFC: Unique Att Spec]
+    /// ----------------------
+    /// An attribute name MUST NOT appear more than once in the same start-tag
+    /// or empty-element tag.
+    ///
+    /// [WFC: No External Entity References]
+    /// ------------------------------------
+    /// Attribute values MUST NOT contain direct or indirect entity references
+    /// to external entities.
+    ///
+    /// [WFC: No < in Attribute Values]
+    /// -------------------------------
+    /// The [replacement text] of any entity referred to directly or indirectly
+    /// in an attribute value MUST NOT contain a `<`.
+    ///
+    /// [WFC: Unique Att Spec]: https://www.w3.org/TR/xml11/#uniqattspec
+    /// [WFC: No External Entity References]: https://www.w3.org/TR/xml11/#NoExternalRefs
+    /// [WFC: No < in Attribute Values]: https://www.w3.org/TR/xml11/#CleanAttrVals
+    /// [replacement text]: https://www.w3.org/TR/xml11/#dt-repltext
+    fn check_well_formedness(&self) -> bool {
+        todo!()
+    }
 }
 
 /// Attribute-related methods
@@ -451,6 +477,18 @@ impl<'a> BytesEnd<'a> {
     #[inline]
     pub fn local_name(&self) -> LocalName {
         self.name().into()
+    }
+
+    /// Well-formedness constraints
+    /// ===========================
+    ///
+    /// [WFC: Element Type Match]
+    /// -------------------------
+    /// The Name in an element's end-tag MUST match the element type in the start-tag.
+    ///
+    /// [WFC: Element Type Match]: https://www.w3.org/TR/xml11/#GIMatch
+    fn check_well_formedness(&self) -> bool {
+        todo!()
     }
 }
 
@@ -1571,6 +1609,318 @@ impl<'a> Event<'a> {
             Event::GeneralRef(e) => Event::GeneralRef(e.borrow()),
             Event::Eof => Event::Eof,
         }
+    }
+
+    /// Well-formedness constraints
+    /// ===========================
+    ///
+    /// [WFC: External Subset]
+    /// ----------------------
+    /// The external subset, if any, MUST match the production for extSubset.
+    ///
+    /// [WFC: PE Between Declarations]
+    /// ------------------------------
+    /// The replacement text of a parameter entity reference in a `DeclSep` MUST
+    /// match the production `extSubsetDecl`.
+    ///
+    /// [WFC: PEs in Internal Subset]
+    /// -----------------------------
+    /// In the internal DTD subset, parameter-entity references MUST NOT occur
+    /// within markup declarations; they may occur where markup declarations
+    /// can occur. (This does not apply to references that occur in external
+    /// parameter entities or to the external subset.)
+    ///
+    /// [WFC: Element Type Match]
+    /// -------------------------
+    /// The Name in an element's end-tag MUST match the element type in the start-tag.
+    ///
+    /// [WFC: Unique Att Spec]
+    /// ----------------------
+    /// An attribute name MUST NOT appear more than once in the same start-tag
+    /// or empty-element tag.
+    ///
+    /// [WFC: No External Entity References]
+    /// ------------------------------------
+    /// Attribute values MUST NOT contain direct or indirect entity references
+    /// to external entities.
+    ///
+    /// [WFC: No < in Attribute Values]
+    /// -------------------------------
+    /// The [replacement text] of any entity referred to directly or indirectly
+    /// in an attribute value MUST NOT contain a `<`.
+    ///
+    /// [WFC: Legal Character]
+    /// ----------------------
+    /// Characters referred to using character references MUST match the production for `Char`.
+    ///
+    /// [WFC: Entity Declared]
+    /// ----------------------
+    /// In a document without any DTD, a document with only an internal DTD subset
+    /// which contains no parameter entity references, or a document with `standalone='yes'`,
+    /// for an entity reference that does not occur within the external subset
+    /// or a parameter entity, the `Name` given in the entity reference MUST
+    /// match that in an entity declaration that does not occur within the
+    /// external subset or a parameter entity, except that well-formed documents
+    /// need not declare any of the following entities: `amp`, `lt`, `gt`, `apos`,
+    /// `quot`. The declaration of a general entity MUST precede any reference
+    /// to it which appears in a default value in an attribute-list declaration.
+    ///
+    /// Note that non-validating processors are not obligated to to read and
+    /// process entity declarations occurring in parameter entities or in the
+    /// external subset; for such documents, the rule that an entity must be
+    /// declared is a well-formedness constraint only if `standalone='yes'`.
+    ///
+    /// [WFC: Parsed Entity]
+    /// --------------------
+    /// An entity reference MUST NOT contain the name of an unparsed entity.
+    /// Unparsed entities may be referred to only in attribute values declared
+    /// to be of type ENTITY or ENTITIES.
+    ///
+    /// [WFC: No Recursion]
+    /// -------------------
+    /// A parsed entity MUST NOT contain a recursive reference to itself, either
+    /// directly or indirectly.
+    ///
+    /// [WFC: In DTD]
+    /// -------------
+    /// Parameter-entity references MUST NOT appear outside the DTD.
+    ///
+    ///
+    ///
+    /// Validity constraints
+    /// ====================
+    ///
+    /// [VC: Element Valid]
+    /// -------------------
+    /// An element is valid if there is a declaration matching `elementdecl`
+    /// where the Name matches the element type, and one of the following holds:
+    /// 1. The declaration matches `EMPTY` and the element has no content
+    ///    (not even entity references, comments, PIs or white space).
+    /// 2. The declaration matches children and the sequence of child elements
+    ///    belongs to the language generated by the regular expression in the
+    ///    content model, with optional white space, comments and PIs (i.e.
+    ///    markup matching production [27] Misc) between the start-tag and the
+    ///    first child element, between child elements, or between the last child
+    ///    element and the end-tag. Note that a CDATA section containing only
+    ///    white space or a reference to an entity whose replacement text is
+    ///    character references expanding to white space do not match the
+    ///    nonterminal `S`, and hence cannot appear in these positions;
+    ///    however, a reference to an internal entity with a literal value
+    ///    consisting of character references expanding to white space does
+    ///    match `S`, since its replacement text is the white space resulting
+    ///    from expansion of the character references.
+    /// 3. The declaration matches `Mixed`, and the content (after replacing
+    ///    any entity references with their replacement text) consists of
+    ///    character data (including CDATA sections), comments, PIs and child
+    ///    elements whose types match names in the content model.
+    /// 4. The declaration matches `ANY`, and the content (after replacing any
+    ///    entity references with their replacement text) consists of character
+    ///    data, CDATA sections, comments, PIs and child elements whose types
+    ///    have been declared.
+    ///
+    /// [VC: Root Element Type]
+    /// -----------------------
+    /// The `Name` in the document type declaration MUST match the element type
+    /// of the root element.
+    ///
+    /// [VC: Proper Declaration/PE Nesting]
+    /// -----------------------------------
+    /// Parameter-entity replacement text MUST be properly nested with markup
+    /// declarations. That is to say, if either the first character or the last
+    /// character of a markup declaration (`markupdecl` above) is contained in
+    /// the replacement text for a parameter-entity reference, both MUST be
+    /// contained in the same replacement text.
+    ///
+    /// [VC: Standalone Document Declaration]
+    /// -------------------------------------
+    /// The standalone document declaration MUST have the value `no` if any
+    /// external markup declarations contain declarations of:
+    /// - attributes with default values, if elements to which these attributes
+    ///   apply appear in the document without specifications of values for these
+    ///   attributes, or
+    /// - entities (other than `amp`, `lt`, `gt`, `apos`, `quot`), if references
+    ///   to those entities appear in the document, or
+    /// - attributes with tokenized types, where the attribute appears in the
+    ///   document with a value such that normalization will produce a different
+    ///   value from that which would be produced in the absence of the declaration, or
+    /// - element types with element content, if white space occurs directly
+    ///   within any instance of those types.
+    ///
+    /// [VC: Attribute Value Type]
+    /// --------------------------
+    /// The attribute MUST have been declared; the value MUST be of the type
+    /// declared for it. (For attribute types, see 3.3 Attribute-List Declarations.)
+    ///
+    /// [VC: Unique Element Type Declaration]
+    /// -------------------------------------
+    /// An element type MUST NOT be declared more than once.
+    ///
+    /// [VC: Proper Group/PE Nesting]
+    /// -----------------------------
+    /// Parameter-entity replacement text MUST be properly nested with parenthesized
+    /// groups. That is to say, if either of the opening or closing parentheses
+    /// in a choice, seq, or Mixed construct is contained in the replacement text
+    /// for a parameter entity, both MUST be contained in the same replacement text.
+    ///
+    /// For interoperability, if a parameter-entity reference appears in a `choice`,
+    /// `seq`, or `Mixed` construct, its replacement text SHOULD contain at least
+    /// one non-blank character, and neither the first nor last non-blank character
+    /// of the replacement text SHOULD be a connector (`|` or `,`).
+    ///
+    /// [VC: No Duplicate Types]
+    /// ------------------------
+    /// The same name MUST NOT appear more than once in a single mixed-content declaration.
+    ///
+    /// [VC: ID]
+    /// --------
+    /// Values of type ID MUST match the Name production. A name MUST NOT appear
+    /// more than once in an XML document as a value of this type; i.e., ID values
+    /// MUST uniquely identify the elements which bear them.
+    ///
+    /// [VC: One ID per Element Type]
+    /// -----------------------------
+    /// An element type MUST NOT have more than one ID attribute specified.
+    ///
+    /// [VC: ID Attribute Default]
+    /// --------------------------
+    /// An element type MUST NOT have more than one ID attribute specified.
+    ///
+    /// [VC: IDREF]
+    /// -----------
+    /// Values of type IDREF MUST match the Name production, and values of type
+    /// IDREFS MUST match Names; each Name MUST match the value of an ID attribute
+    /// on some element in the XML document; i.e. IDREF values MUST match the
+    /// value of some ID attribute.
+    ///
+    /// [VC: Entity Name]
+    /// -----------------
+    /// Values of type ENTITY MUST match the Name production, values of type
+    /// ENTITIES MUST match Names; each Name MUST match the name of an unparsed
+    /// entity declared in the DTD.
+    ///
+    /// [VC: Name Token]
+    /// ----------------
+    /// Values of type NMTOKEN MUST match the Nmtoken production; values of type
+    /// NMTOKENS MUST match Nmtokens.
+    ///
+    /// [VC: Notation Attributes]
+    /// -------------------------
+    /// Values of this type MUST match one of the notation names included in
+    /// the declaration; all notation names in the declaration MUST be declared.
+    ///
+    /// [VC: One Notation Per Element Type]
+    /// -----------------------------------
+    /// An element type MUST NOT have more than one NOTATION attribute specified.
+    ///
+    /// [VC: No Notation on Empty Element]
+    /// ----------------------------------
+    /// For compatibility, an attribute of type NOTATION MUST NOT be declared
+    /// on an element declared EMPTY.
+    ///
+    /// [VC: No Duplicate Tokens]
+    /// -------------------------
+    /// The notation names in a single NotationType attribute declaration,
+    /// as well as the NmTokens in a single Enumeration attribute declaration,
+    /// MUST all be distinct.
+    ///
+    /// [VC: Enumeration]
+    /// -----------------
+    /// Values of this type MUST match one of the Nmtoken tokens in the declaration.
+    ///
+    /// [VC: Required Attribute]
+    /// ------------------------
+    /// If the default declaration is the keyword #REQUIRED, then the attribute
+    /// MUST be specified for all elements of the type in the attribute-list declaration.
+    ///
+    /// [VC: Attribute Default Value Syntactically Correct]
+    /// ---------------------------------------------------
+    /// The declared default value MUST meet the syntactic constraints of the
+    /// declared attribute type. That is, the default value of an attribute:
+    /// - of type IDREF or ENTITY must match the Name production;
+    /// - of type IDREFS or ENTITIES must match the Names production;
+    /// - of type NMTOKEN must match the Nmtoken production;
+    /// - of type NMTOKENS must match the Nmtokens production;
+    /// - of an enumerated type (either a NOTATION type or an enumeration) must
+    ///   match one of the enumerated values.
+    ///
+    /// Note that only the syntactic constraints of the type are required here;
+    /// other constraints (e.g. that the value be the name of a declared unparsed
+    /// entity, for an attribute of type ENTITY) will be reported by a validating
+    /// parser only if an element without a specification for this attribute actually occurs.
+    ///
+    /// [VC: Fixed Attribute Default]
+    /// -----------------------------
+    /// If an attribute has a default value declared with the #FIXED keyword,
+    /// instances of that attribute MUST match the default value.
+    ///
+    /// [VC: Proper Conditional Section/PE Nesting]
+    /// -------------------------------------------
+    /// If any of the `<![`, `[`, or `]]>` of a conditional section is contained
+    /// in the replacement text for a parameter-entity reference, all of them
+    /// MUST be contained in the same replacement text.
+    ///
+    /// [VC: Entity Declared]
+    /// ---------------------
+    /// In a document with an external subset or parameter entity references with
+    /// `standalone='no'`, the `Name` given in the entity reference MUST match
+    /// that in an entity declaration. For interoperability, valid documents
+    /// SHOULD declare the entities `amp`, `lt`, `gt`, `apos`, `quot`, in the
+    /// form specified in 4.6 Predefined Entities. The declaration of a parameter
+    /// entity MUST precede any reference to it. Similarly, the declaration of
+    /// a general entity MUST precede any attribute-list declaration containing
+    /// a default value with a direct or indirect reference to that general entity.
+    ///
+    /// [VC: Notation Declared]
+    /// -----------------------
+    /// The `Name` MUST match the declared name of a notation.
+    ///
+    /// [VC: Unique Notation Name]
+    /// --------------------------
+    /// A given `Name` MUST NOT be declared in more than one notation declaration.
+    ///
+    ///
+    ///
+    /// [WFC: External Subset]: https://www.w3.org/TR/xml11/#ExtSubset
+    /// [WFC: PE Between Declarations]: https://www.w3.org/TR/xml11/#PE-between-Decls
+    /// [WFC: PEs in Internal Subset]: https://www.w3.org/TR/xml11/#wfc-PEinInternalSubset
+    /// [WFC: Element Type Match]: https://www.w3.org/TR/xml11/#GIMatch
+    /// [WFC: Unique Att Spec]: https://www.w3.org/TR/xml11/#uniqattspec
+    /// [WFC: No External Entity References]: https://www.w3.org/TR/xml11/#NoExternalRefs
+    /// [WFC: No < in Attribute Values]: https://www.w3.org/TR/xml11/#CleanAttrVals
+    /// [WFC: Legal Character]: https://www.w3.org/TR/xml11/#wf-Legalchar
+    /// [WFC: Entity Declared]: https://www.w3.org/TR/xml11/#wf-entdeclared
+    /// [WFC: Parsed Entity]: https://www.w3.org/TR/xml11/#textent
+    /// [WFC: No Recursion]: https://www.w3.org/TR/xml11/#norecursion
+    /// [WFC: In DTD]: https://www.w3.org/TR/xml11/#indtd
+    /// [VC: Element Valid]: https://www.w3.org/TR/xml11/#elementvalid
+    /// [VC: Root Element Type]: https://www.w3.org/TR/xml11/#vc-roottype
+    /// [VC: Proper Declaration/PE Nesting]: https://www.w3.org/TR/xml11/#vc-PEinMarkupDecl
+    /// [VC: Standalone Document Declaration]: https://www.w3.org/TR/xml11/#vc-check-rmd
+    /// [VC: Attribute Value Type]: https://www.w3.org/TR/xml11/#ValueType
+    /// [VC: Unique Element Type Declaration]: https://www.w3.org/TR/xml11/#EDUnique
+    /// [VC: Proper Group/PE Nesting]: https://www.w3.org/TR/xml11/#vc-PEinGroup
+    /// [VC: No Duplicate Types]: https://www.w3.org/TR/xml11/#vc-MixedChildrenUnique
+    /// [VC: ID]: https://www.w3.org/TR/xml11/#id
+    /// [VC: One ID per Element Type]: https://www.w3.org/TR/xml11/#one-id-per-el
+    /// [VC: ID Attribute Default]: https://www.w3.org/TR/xml11/#id-default
+    /// [VC: IDREF]: https://www.w3.org/TR/xml11/#idref
+    /// [VC: Entity Name]: https://www.w3.org/TR/xml11/#entname
+    /// [VC: Name Token]: https://www.w3.org/TR/xml11/#nmtok
+    /// [VC: Notation Attributes]: https://www.w3.org/TR/xml11/#notatn
+    /// [VC: One Notation Per Element Type]: https://www.w3.org/TR/xml11/#OneNotationPer
+    /// [VC: No Notation on Empty Element]: https://www.w3.org/TR/xml11/#NoNotationEmpty
+    /// [VC: No Duplicate Tokens]: https://www.w3.org/TR/xml11/#NoDuplicateTokens
+    /// [VC: Enumeration]: https://www.w3.org/TR/xml11/#enum
+    /// [VC: Required Attribute]: https://www.w3.org/TR/xml11/#RequiredAttr
+    /// [VC: Attribute Default Value Syntactically Correct]: https://www.w3.org/TR/xml11/#defattrvalid
+    /// [VC: Fixed Attribute Default]: https://www.w3.org/TR/xml11/#FixedAttr
+    /// [VC: Proper Conditional Section/PE Nesting]: https://www.w3.org/TR/xml11/#condsec-nesting
+    /// [VC: Entity Declared]: https://www.w3.org/TR/xml11/#vc-entdeclared
+    /// [VC: Notation Declared]: https://www.w3.org/TR/xml11/#not-declared
+    /// [VC: Unique Notation Name]: https://www.w3.org/TR/xml11/#UniqueNotationName
+    /// [replacement text]: https://www.w3.org/TR/xml11/#dt-repltext
+    fn validate(&self) {
+        todo!()
     }
 }
 
