@@ -465,6 +465,7 @@ mod buffered_reader;
 mod ns_reader;
 mod slice_reader;
 mod state;
+mod validation;
 
 pub use ns_reader::NsReader;
 
