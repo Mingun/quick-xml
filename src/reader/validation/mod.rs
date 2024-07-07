@@ -21,6 +21,13 @@ pub enum ValidationError {
     /// The parser started to parse entity or character reference (`&...;`) in text,
     /// but the input ended before the closing `;` character was found.
     UnclosedReference,
+    /// A comment contains forbidden double-hyphen (`--`) sequence inside.
+    ///
+    /// According to the [specification], for compatibility, comments MUST NOT contain
+    /// double-hyphen (`--`) sequence, in particular, they cannot end by `--->`.
+    ///
+    /// [specification]: https://www.w3.org/TR/xml11/#sec-comments
+    DoubleHyphenInComment,
 }
 
 impl fmt::Display for ValidationError {
@@ -36,6 +43,9 @@ impl fmt::Display for ValidationError {
             Self::UnclosedReference => f.write_str(
                 "entity or character reference not closed: `;` not found before end of input",
             ),
+            Self::DoubleHyphenInComment => f.write_str(
+                "forbidden string `--` was found in a comment"
+            ),
             _ => write!(f, "{:?}", self), // TODO: implement correct text errors
         }
     }
@@ -46,10 +56,12 @@ impl std::error::Error for ValidationError {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mod cdata;
+mod comment;
 mod name;
 mod text;
 
 pub use cdata::*;
+pub use comment::*;
 pub use name::*;
 pub use text::*;
 
