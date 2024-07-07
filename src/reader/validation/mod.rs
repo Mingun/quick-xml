@@ -46,8 +46,10 @@ impl std::error::Error for ValidationError {}
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 mod name;
+mod text;
 
 pub use name::*;
+pub use text::*;
 
 /// Checks if the character corresponds to the [`Char`] production of
 /// the XML 1.0 specification.
