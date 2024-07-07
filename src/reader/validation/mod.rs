@@ -1,4 +1,5 @@
 use std::fmt;
+use std::iter::FusedIterator;
 use std::str::Chars;
 
 /// An error returned if [well-formedless constraint][WFC] or [validaty constraint][VC]
@@ -148,3 +149,62 @@ fn valid_chars(iter: &mut Chars) -> Option<ValidationError> {
     }
     None
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Iterator over validation errors of event.
+#[derive(Clone, Debug)]
+pub enum EventValidationIter<'i> {
+    /// Validation iterator for [`Start`] and [`Empty`] events.
+    ///
+    /// [`Start`]: crate::events::Event::Start
+    /// [`Empty`]: crate::events::Event::Empty
+    Start(StartValidationIter<'i>),
+    /// Validation iterator for [`End`] events.
+    ///
+    /// [`End`]: crate::events::Event::End
+    End(NameValidationIter<'i>),
+    /// Validation iterator for [`Text`] events.
+    ///
+    /// [`Text`]: crate::events::Event::Text
+    Text(TextValidationIter<'i>),
+    /// Validation iterator for [`CData`] events.
+    ///
+    /// [`CData`]: crate::events::Event::CData
+    CData(CDataValidationIter<'i>),
+    /// Validation iterator for [`Comment`] events.
+    ///
+    /// [`Comment`]: crate::events::Event::Comment
+    Comment(CommentValidationIter<'i>),
+    /// Validation iterator for [`Decl`] events.
+    ///
+    /// [`Decl`]: crate::events::Event::Decl
+    Decl(DeclValidationIter<'i>),
+    /// Validation iterator for [`PI`] events.
+    ///
+    /// [`PI`]: crate::events::Event::PI
+    PI(PIValidationIter<'i>),
+    /// Validation iterator for [`DocType`] events.
+    ///
+    /// [`DocType`]: crate::events::Event::DocType
+    Doctype(DoctypeValidationIter<'i>),
+}
+
+impl<'i> Iterator for EventValidationIter<'i> {
+    type Item = ValidationError;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            EventValidationIter::Start(it) => it.next(),
+            EventValidationIter::End(it) => it.next(),
+            EventValidationIter::Text(it) => it.next(),
+            EventValidationIter::CData(it) => it.next(),
+            EventValidationIter::Comment(it) => it.next(),
+            EventValidationIter::Decl(it) => it.next(),
+            EventValidationIter::PI(it) => it.next(),
+            EventValidationIter::Doctype(it) => it.next(),
+        }
+    }
+}
+
+impl<'i> FusedIterator for EventValidationIter<'i> {}
