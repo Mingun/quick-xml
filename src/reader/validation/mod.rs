@@ -58,11 +58,13 @@ impl std::error::Error for ValidationError {}
 mod cdata;
 mod comment;
 mod name;
+mod start;
 mod text;
 
 pub use cdata::*;
 pub use comment::*;
 pub use name::*;
+pub use start::*;
 pub use text::*;
 
 /// Checks if the character corresponds to the [`Char`] production of
