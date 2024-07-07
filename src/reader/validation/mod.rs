@@ -59,6 +59,7 @@ mod cdata;
 mod comment;
 mod decl;
 mod name;
+mod pi;
 mod start;
 mod text;
 
@@ -66,6 +67,7 @@ pub use cdata::*;
 pub use comment::*;
 pub use decl::*;
 pub use name::*;
+pub use pi::*;
 pub use start::*;
 pub use text::*;
 
