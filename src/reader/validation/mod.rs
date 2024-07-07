@@ -60,6 +60,7 @@ impl std::error::Error for ValidationError {}
 mod cdata;
 mod comment;
 mod decl;
+mod doctype;
 mod name;
 mod pi;
 mod start;
@@ -68,6 +69,7 @@ mod text;
 pub use cdata::CDataValidationIter;
 pub use comment::CommentValidationIter;
 pub use decl::DeclValidationIter;
+pub use doctype::DoctypeValidationIter;
 pub use name::*;
 pub use pi::*;
 pub use start::*;
