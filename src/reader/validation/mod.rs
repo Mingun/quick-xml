@@ -59,12 +59,14 @@ impl std::error::Error for ValidationError {}
 
 mod cdata;
 mod comment;
+mod decl;
 mod name;
 mod start;
 mod text;
 
 pub use cdata::CDataValidationIter;
 pub use comment::CommentValidationIter;
+pub use decl::DeclValidationIter;
 pub use name::*;
 pub use start::*;
 pub use text::*;
