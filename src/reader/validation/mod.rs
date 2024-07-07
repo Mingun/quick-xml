@@ -57,12 +57,14 @@ impl std::error::Error for ValidationError {}
 
 mod cdata;
 mod comment;
+mod decl;
 mod name;
 mod start;
 mod text;
 
 pub use cdata::*;
 pub use comment::*;
+pub use decl::*;
 pub use name::*;
 pub use start::*;
 pub use text::*;
