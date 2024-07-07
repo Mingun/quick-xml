@@ -43,7 +43,6 @@ fn test_bytes(input: &[u8], output: &[u8], trim: bool) {
     let mut reader = NsReader::from_reader(input);
     let config = reader.config_mut();
     config.trim_text(trim);
-    config.check_comments = true;
 
     let mut spec_lines = SpecIter(output).enumerate();
 

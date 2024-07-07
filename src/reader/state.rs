@@ -109,35 +109,6 @@ impl ReaderState {
                     "comment must end with '-->':\n{:?}",
                     crate::utils::Bytes(buf_bytes)
                 );
-                if self.config.check_comments {
-                    // search if '--' not in comments
-                    let mut haystack = &buf_bytes[4..len - 3];
-                    let mut off = 0;
-                    while let Some(p) = memchr::memchr(b'-', haystack) {
-                        off += p + 1;
-                        // if next byte after `-` is also `-`, return an error
-                        if buf_bytes[4 + off] == b'-' {
-                            // Explanation of the magic:
-                            //
-                            // - `self.offset` just after `>`,
-                            // - `buf` contains `<!-- con--tent --`
-                            // - `p` is counted from byte after `<!--`
-                            //
-                            // <!-- con--tent -->:
-                            // ~~~~~~~~~~~~~~~~~~: - buf
-                            //  :  ===========   : - zone of search (possible values of `p`)
-                            //  :  |---p         : - p is counted from | (| is 0)
-                            //  :  :   :         ^ - self.offset
-                            //  ^  :   :           - self.offset - len
-                            //     ^   :           - self.offset - len + 4
-                            //         ^           - self.offset - len + 4 + p
-                            self.last_error_offset = self.offset - len as u64 + 4 + p as u64;
-                            return Err(Error::IllFormed(IllFormedError::DoubleHyphenInComment));
-                        }
-                        // Continue search after single `-` (+1 to skip it)
-                        haystack = &haystack[p + 1..];
-                    }
-                }
                 Ok(Event::Comment(BytesComment::wrap(
                     // Cut of `<!--` and `-->` from start and end
                     &buf[4..len - 3],

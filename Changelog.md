@@ -16,7 +16,15 @@
 
 ### Breaking Changes
 
+`Config::check_comments` option was removed (it was `false` dy default). Use the new validation API
+instead:
+- `BytesComment::validate()`
+- `BytesComment::validated()`
+
 ### New Features
+
+- [#1010]: Introduce validation API to check events for well-formedless and validation errors.
+  Check the new `quick_xml::reader::validation` module.
 
 ### Bug Fixes
 
@@ -30,6 +38,7 @@
 [#1005]: https://github.com/tafia/quick-xml/pull/1005
 [#1007]: https://github.com/tafia/quick-xml/pull/1007
 [#1009]: https://github.com/tafia/quick-xml/pull/1009
+[#1010]: https://github.com/tafia/quick-xml/pull/1010
 
 
 ## 0.42.0 -- 2026-08-22

@@ -53,6 +53,7 @@ use crate::escape::{
     partial_escape,
 };
 use crate::name::{LocalName, QName};
+use crate::reader::validation::{CommentValidationIter, ValidationError};
 use crate::utils::{self, name_len, trim_xml_end, trim_xml_start, write_cow_string};
 use attributes::{AttrError, Attribute, Attributes};
 
@@ -1147,6 +1148,19 @@ impl<'i> BytesComment<'i> {
     #[inline]
     pub fn html_content(&self) -> Cow<'i, str> {
         self.content.html_content()
+    }
+
+    /// Returns the iterator that will return all errors inside this event
+    pub fn validate(&self) -> CommentValidationIter<'_> {
+        CommentValidationIter::new(self)
+    }
+
+    /// Performs validation of the event and returns event itself if there is no errors
+    pub fn validated(self) -> Result<Self, ValidationError> {
+        if let Some(err) = self.validate().next() {
+            return Err(err);
+        }
+        Ok(self)
     }
 }
 

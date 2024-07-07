@@ -645,14 +645,6 @@ mod ill_formed {
         found: "end".to_string(),
     });
 
-    event_ok!(double_hyphen_in_comment1("<!---->") => 7: Event::Comment(BytesComment::new("").unwrap()));
-    err!(double_hyphen_in_comment2("<!----->") => 4: IllFormedError::DoubleHyphenInComment);
-    //                                  ^= 4
-    err!(double_hyphen_in_comment3("<!-- --->") => 5: IllFormedError::DoubleHyphenInComment);
-    //                                   ^= 5
-    err!(double_hyphen_in_comment4("<!-- -- -->") => 5: IllFormedError::DoubleHyphenInComment);
-    //                                   ^= 5
-
     mod reference {
         use super::*;
         use quick_xml::events::BytesRef;

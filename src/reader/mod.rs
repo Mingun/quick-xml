@@ -70,21 +70,6 @@ pub struct Config {
     /// [`End`]: crate::events::Event::End
     pub allow_unmatched_ends: bool,
 
-    /// Whether comments should be validated. If enabled, in case of invalid comment
-    /// [`Error::IllFormed(DoubleHyphenInComment)`] is returned from read methods.
-    ///
-    /// When set to `true`, every [`Comment`] event will be checked for not
-    /// containing `--`, which [is not allowed] in XML comments. Most of the time
-    /// we don't want comments at all so we don't really care about comment
-    /// correctness, thus the default value is `false` to improve performance.
-    ///
-    /// Default: `false`
-    ///
-    /// [`Error::IllFormed(DoubleHyphenInComment)`]: crate::errors::IllFormedError::DoubleHyphenInComment
-    /// [`Comment`]: crate::events::Event::Comment
-    /// [is not allowed]: https://www.w3.org/TR/xml11/#sec-comments
-    pub check_comments: bool,
-
     /// Whether mismatched closing tag names should be detected. If enabled, in
     /// case of mismatch the [`Error::IllFormed(MismatchedEndTag)`] is returned from
     /// read methods.
@@ -252,11 +237,9 @@ impl Config {
     }
 
     /// Turn on or off all checks for well-formedness. Currently it is that settings:
-    /// - [`check_comments`](Self::check_comments)
     /// - [`check_end_names`](Self::check_end_names)
     #[inline]
     pub fn enable_all_checks(&mut self, enable: bool) {
-        self.check_comments = enable;
         self.check_end_names = enable;
     }
 }
@@ -266,7 +249,6 @@ impl Default for Config {
         Self {
             allow_dangling_amp: false,
             allow_unmatched_ends: false,
-            check_comments: false,
             check_end_names: true,
             expand_empty_elements: false,
             trim_markup_names_in_closing_tags: true,
@@ -567,6 +549,7 @@ mod buffered_reader;
 mod ns_reader;
 mod slice_reader;
 mod state;
+pub mod validation;
 
 pub use ns_reader::NsReader;
 

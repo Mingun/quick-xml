@@ -129,17 +129,6 @@ pub enum IllFormedError {
         /// Name of actually closed tag
         found: String,
     },
-    /// A comment contains forbidden double-hyphen (`--`) sequence inside.
-    ///
-    /// According to the [specification], for compatibility, comments MUST NOT contain
-    /// double-hyphen (`--`) sequence, in particular, they cannot end by `--->`.
-    ///
-    /// The quick-xml by default does not check that, because this restriction is
-    /// mostly artificial, but you can enable it in the [configuration].
-    ///
-    /// [specification]: https://www.w3.org/TR/xml11/#sec-comments
-    /// [configuration]: crate::reader::Config::check_comments
-    DoubleHyphenInComment,
     /// The parser started to parse entity or character reference (`&...;`) in text,
     /// but the input ended before the closing `;` character was found.
     UnclosedReference,
@@ -177,9 +166,6 @@ impl fmt::Display for IllFormedError {
                 "expected `</{}>`, but `</{}>` was found",
                 expected, found,
             ),
-            Self::DoubleHyphenInComment => {
-                f.write_str("forbidden string `--` was found in a comment")
-            }
             Self::UnclosedReference => f.write_str(
                 "entity or character reference not closed: `;` not found before end of input",
             ),
