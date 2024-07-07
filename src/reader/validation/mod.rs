@@ -45,9 +45,11 @@ impl std::error::Error for ValidationError {}
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+mod cdata;
 mod name;
 mod text;
 
+pub use cdata::*;
 pub use name::*;
 pub use text::*;
 
