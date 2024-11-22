@@ -14,6 +14,8 @@
 
 ## Unreleased
 
+The new `XmlReader` type was added that is automatically resolves general entity references.
+
 ### New Features
 
 - [#938]: Add new enumeration `XmlVersion` and typified getter `BytesDecl::xml_version()`.
@@ -33,6 +35,10 @@
 
   Deprecated functions now behaves the same as newly added.
 
+- [#948]: Add `quick_xml::reader::EntityResolver` which is able to resolve external entities.
+- [#948]: Add `quick_xml::reader::XmlReader`, a new high-level reader which should be preferred
+  over the old `Reader`.
+
 ### Bug Fixes
 
 - [#938]: Use correct rules for EOL normalization in `Deserializer` when parse XML 1.0 documents.
@@ -51,6 +57,7 @@
 [#914]: https://github.com/tafia/quick-xml/pull/914
 [#938]: https://github.com/tafia/quick-xml/pull/938
 [#944]: https://github.com/tafia/quick-xml/pull/944
+[#948]: https://github.com/tafia/quick-xml/pull/948
 
 
 ## 0.39.2 -- 2026-02-20

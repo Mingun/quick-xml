@@ -206,6 +206,13 @@ pub enum Error {
     Escape(EscapeError),
     /// Parsed XML has some namespace-related problems
     Namespace(NamespaceError),
+    /// The error returned by [`EntityResolver::capture`](crate::reader::EntityResolver::capture).
+    DoctypeParse(Arc<dyn std::error::Error>),
+    /// Entity reference was not resolved to the entity; [`EntityResolver::resolve`] returned `None`.
+    /// Contains the name of entity without `&` and `;`.
+    ///
+    /// [`EntityResolver::resolve`]: crate::reader::EntityResolver::resolve
+    UnrecognizedGeneralEntity(String),
 }
 
 impl Error {
@@ -284,6 +291,8 @@ impl fmt::Display for Error {
             Self::Encoding(e) => e.fmt(f),
             Self::Escape(e) => e.fmt(f),
             Self::Namespace(e) => e.fmt(f),
+            Self::DoctypeParse(e) => write!(f, "cannot parse DTD: {}", e),
+            Self::UnrecognizedGeneralEntity(e) => write!(f, "unrecognized general entity `{}`", e),
         }
     }
 }
@@ -298,6 +307,8 @@ impl std::error::Error for Error {
             Self::Encoding(e) => Some(e),
             Self::Escape(e) => Some(e),
             Self::Namespace(e) => Some(e),
+            Self::DoctypeParse(e) => Some(e),
+            Self::UnrecognizedGeneralEntity(_) => None,
         }
     }
 }

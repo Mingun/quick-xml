@@ -2,14 +2,20 @@
 
 #[cfg(feature = "encoding")]
 use encoding_rs::Encoding;
-use std::io;
+use std::borrow::Cow;
+use std::collections::VecDeque;
+use std::fmt;
+use std::io::{self, BufRead, Cursor};
 use std::ops::Range;
+use std::sync::Arc;
 
 use crate::encoding::Decoder;
 use crate::errors::{Error, IllFormedError, SyntaxError};
-use crate::events::{BytesRef, Event};
+use crate::escape::{parse_number, EscapeError};
+use crate::events::{BytesRef, BytesText, Event};
 use crate::parser::{DtdParser, ElementParser, Parser, PiParser};
 use crate::reader::state::ReaderState;
+use crate::XmlVersion;
 
 /// A struct that holds a parser configuration.
 ///
@@ -249,6 +255,14 @@ impl Default for Config {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+
+mod event;
+mod resolver;
+
+pub use event::Event as XmlEvent;
+pub use resolver::{
+    EntityResolver, EntityResolverFactory, PredefinedEntityResolver, ReplacementText,
+};
 
 macro_rules! read_event_impl {
     (
@@ -1223,6 +1237,327 @@ impl BangType {
             Self::Comment => SyntaxError::UnclosedComment,
             Self::DocType(_) => SyntaxError::UnclosedDoctype,
         }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// Result of reading event by the underlying reader
+enum ReadEvent<'i> {
+    /// Upper-level reader should skip event and request another one from the underlying reader
+    Skip,
+    Event(XmlEvent<'i>),
+    ExternalEntity(Reader<Box<dyn BufRead>>),
+}
+
+impl<'i> fmt::Debug for ReadEvent<'i> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Skip => f.write_str("Skip"),
+            Self::Event(r) => write!(f, "Event({:?})", r),
+            Self::ExternalEntity(r) => write!(f, "ExternalEntity({:p})", &r),
+        }
+    }
+}
+
+enum EntityReader<'i, 'e> {
+    /// Reader of internal entity, i.e. the entity defined in the same source as
+    /// a main document, that returns borrowed events.
+    InternalBorrowed(Reader<&'i [u8]>),
+    /// Reader of internal entity, i.e. the entity defined in the same source as
+    /// a main document, that returns owned events.
+    InternalOwned(Reader<Box<dyn BufRead + 'i>>),
+    /// Reader of external entity, i.e. the entity defined in the different from the main document
+    /// source.
+    External(Reader<Box<dyn BufRead + 'e>>),
+}
+
+impl<'i, 'e> fmt::Debug for EntityReader<'i, 'e> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InternalBorrowed(r) => r.fmt(f),
+            Self::InternalOwned(r) => write!(f, "InternalOwned({:p})", &r),
+            Self::External(r) => write!(f, "External({:p})", &r),
+        }
+    }
+}
+
+impl<'i, 'e> EntityReader<'i, 'e> {
+    const fn config(&self) -> &Config {
+        match self {
+            Self::InternalBorrowed(r) => r.config(),
+            Self::InternalOwned(r) => r.config(),
+            Self::External(r) => r.config(),
+        }
+    }
+
+    const fn decoder(&self) -> Decoder {
+        match self {
+            Self::InternalBorrowed(r) => r.decoder(),
+            Self::InternalOwned(r) => r.decoder(),
+            Self::External(r) => r.decoder(),
+        }
+    }
+
+    const fn buffer_position(&self) -> u64 {
+        match self {
+            Self::InternalBorrowed(r) => r.buffer_position(),
+            Self::InternalOwned(r) => r.buffer_position(),
+            Self::External(r) => r.buffer_position(),
+        }
+    }
+
+    const fn error_position(&self) -> u64 {
+        match self {
+            Self::InternalBorrowed(r) => r.error_position(),
+            Self::InternalOwned(r) => r.error_position(),
+            Self::External(r) => r.error_position(),
+        }
+    }
+
+    fn read_event(&mut self, buf: &mut Vec<u8>) -> Result<Event<'i>, Error> {
+        match self {
+            Self::InternalBorrowed(r) => r.read_event(),
+            Self::InternalOwned(r) => Ok(r.read_event_into(buf)?.into_owned()),
+            Self::External(r) => Ok(r.read_event_into(buf)?.into_owned()),
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// One single parse unit, for example, a file. In XML specification it is called
+/// _entity_, but we avoid calling it that as it may lead to confusion. Under _entity_
+/// XML consumers usually mean thing that in specification called "entity reference".
+///
+/// Cite from the [specification]:
+///
+/// > Each XML document has both a logical and a physical structure.
+/// > Physically, the document is composed of units called **entities**.
+/// > An entity may refer to other entities to cause their inclusion in the document.
+/// > A document begins in a "root" or document entity. Logically, the document
+/// > is composed of declarations, elements, comments, character references,
+/// > and processing instructions, all of which are indicated in the document
+/// > by explicit markup. The logical and physical structures MUST nest properly,
+/// > as described in 4.3.2 Well-Formed Parsed Entities.
+///
+/// [Also]:
+/// > An XML document may consist of one or many storage units. These are called
+/// > _entities_; they all have content and are all (except for the document entity
+/// > and the external DTD subset) identified by entity **name**.
+///
+/// # Lifetimes
+/// The `'i` lifetime stands for "input" and is a lifetime of a document entity,
+/// i.e. the source which the end-user requested to parse.
+///
+/// The `'e` lifetime stands for "external" and it is a lifetime of an external source
+/// which the end-user requested to parse.
+///
+/// [specification]: https://www.w3.org/TR/xml11/#sec-documents
+/// [Also]: https://www.w3.org/TR/xml11/#dt-entity
+#[derive(Debug)]
+struct StorageUnit<'i, 'e, E> {
+    /// Readers used to produce events from this entity.
+    parts: VecDeque<EntityReader<'i, 'e>>,
+
+    /// Version of XML standard used by this storage unit.
+    version: XmlVersion,
+
+    /// Used to resolve unknown entities that would otherwise cause the parser
+    /// to return an [`Error::UnrecognizedGeneralEntity`] error.
+    entity_resolver: E,
+}
+impl<'i, 'e, E> StorageUnit<'i, 'e, E>
+where
+    E: EntityResolver<'i>,
+{
+    fn new(part: EntityReader<'i, 'e>, entity_resolver: E) -> Self {
+        Self {
+            parts: VecDeque::from([part]),
+            version: XmlVersion::V1_0,
+            entity_resolver,
+        }
+    }
+
+    fn read_event(&mut self, buf: &mut Vec<u8>) -> Result<ReadEvent<'i>, Error> {
+        while let Some(part) = self.parts.back_mut() {
+            let event = match part.read_event(buf)? {
+                Event::Decl(e) => {
+                    self.version = e.xml_version()?;
+                    ReadEvent::Skip
+                }
+                Event::Comment(_) => ReadEvent::Skip,
+
+                Event::DocType(doctype) => {
+                    self.entity_resolver
+                        .capture(doctype)
+                        .map_err(|e| Error::DoctypeParse(Arc::new(e)))?;
+                    ReadEvent::Skip
+                }
+                Event::GeneralRef(e) => {
+                    let reference = part.decoder().decode(&e)?;
+                    if let Some(num) = reference.strip_prefix('#') {
+                        let codepoint = parse_number(num).map_err(EscapeError::InvalidCharRef)?;
+                        let mut bytes = [0u8; 4];
+                        let text = BytesText::wrap(
+                            codepoint.encode_utf8(&mut bytes).as_bytes(),
+                            Decoder::utf8(),
+                        );
+                        return Ok(ReadEvent::Event(XmlEvent::Text(text.into_owned())));
+                    }
+                    match self.entity_resolver.resolve(reference.as_ref()) {
+                        Some(ReplacementText::Internal(Cow::Borrowed(entity))) => {
+                            let mut nested = Reader::from_reader(entity);
+                            *nested.config_mut() = part.config().clone();
+                            self.parts.push_back(EntityReader::InternalBorrowed(nested));
+                            continue;
+                        }
+                        Some(ReplacementText::Internal(Cow::Owned(entity))) => {
+                            let boxed: Box<dyn BufRead> = Box::new(Cursor::new(entity));
+                            let mut nested = Reader::from_reader(boxed);
+                            *nested.config_mut() = part.config().clone();
+                            self.parts.push_back(EntityReader::InternalOwned(nested));
+                            continue;
+                        }
+                        Some(ReplacementText::External(source)) => {
+                            let mut external = Reader::from_reader(source);
+                            *external.config_mut() = part.config().clone();
+                            ReadEvent::ExternalEntity(external)
+                        }
+                        _ => return Err(Error::UnrecognizedGeneralEntity(reference.into_owned())),
+                    }
+                }
+
+                Event::Empty(e) => ReadEvent::Event(XmlEvent::Empty(e)),
+                Event::Start(e) => ReadEvent::Event(XmlEvent::Start(e)),
+                Event::End(e) => ReadEvent::Event(XmlEvent::End(e)),
+                Event::Text(e) => ReadEvent::Event(XmlEvent::Text(e)),
+                Event::CData(e) => ReadEvent::Event(XmlEvent::CData(e)),
+                Event::PI(e) => ReadEvent::Event(XmlEvent::PI(e)),
+                Event::Eof => {
+                    self.parts.pop_back();
+                    continue;
+                }
+            };
+            return Ok(event);
+        }
+        Ok(ReadEvent::Event(XmlEvent::Eof))
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// High-level XML reader which automatically resolves entity references (`&...;`)
+/// and can stream events from several physical documents (storage units, called _entities_
+/// in the XML [specification]).
+///
+/// # Lifetimes
+/// The `'i` lifetime stands for "input" and is a lifetime of a document entity,
+/// i.e. the source which the end-user requested to parse, _from which events may borrow_.
+///
+/// The `'e` lifetime stands for "external" and it is a lifetime of _any_ entity,
+/// that parser may parse, from which events will not borrow data.
+///
+/// # Type parameter
+/// `EF`: the general entity resolver. Used to resolve unknown entities that would
+/// otherwise cause the parser to return an [`Error::UnrecognizedGeneralEntity`] error.
+///
+/// Note, that the same entity resolved is used to resolve entity references as in initial
+/// document, as in any other documents loaded due to entity resolution.
+///
+/// [specification]: https://www.w3.org/TR/xml11/#sec-documents
+#[derive(Debug)]
+pub struct XmlReader<'i, 'e, EF = PredefinedEntityResolver>
+where
+    EF: EntityResolverFactory<'i>,
+{
+    /// Stack of things that represents individual storage units, such as files.
+    /// The first element is the initial unit, representing document which user
+    /// want to parse, others readers created for each resolved external entity
+    /// (entity, defined in another storage unit).
+    units: VecDeque<StorageUnit<'i, 'e, EF::Resolver>>,
+
+    /// Buffer to which external readers will read data. After reading each event
+    /// data is copied to the event data and buffer is cleared
+    buffer: Vec<u8>,
+
+    entity_resolver_factory: EF,
+}
+
+impl<'i, 'e, EF> XmlReader<'i, 'e, EF>
+where
+    EF: EntityResolverFactory<'i>,
+{
+    fn new(part: EntityReader<'i, 'e>, mut entity_resolver_factory: EF) -> Self {
+        let resolver = entity_resolver_factory.new_resolver();
+        Self {
+            units: VecDeque::from([StorageUnit::new(part, resolver)]),
+            buffer: Vec::new(),
+            entity_resolver_factory,
+        }
+    }
+
+    /// Creates new `Reader` from low-level reader and entity resolver, which would
+    /// borrow event data from the source when event represent piece of original document.
+    /// Events from other entities (documents loaded during entity resolution) would
+    /// own data.
+    ///
+    /// For each resolved entity a new [`Reader`] would be created to read entity
+    /// data. That reader will receive a copy of configuration that would set for
+    /// `reader`. If `entity_resolver` returns [`ReplacementText::Internal`], then events
+    /// from that entity would also borrow from the source, otherwise they will
+    /// maintain an own copy of data.
+    pub fn borrowed(reader: Reader<&'i [u8]>, entity_resolver_factory: EF) -> Self {
+        Self::new(
+            EntityReader::InternalBorrowed(reader),
+            entity_resolver_factory,
+        )
+    }
+
+    /// Creates new `Reader` from low-level reader and entity resolver, where all
+    /// events would store its own copy of data.
+    ///
+    /// For each resolved entity a new [`Reader`] would be created to read entity
+    /// data. That reader will receive a copy of configuration that would set for
+    /// `reader`.
+    pub fn buffered(reader: Reader<Box<dyn BufRead + 'i>>, entity_resolver_factory: EF) -> Self {
+        Self::new(EntityReader::InternalOwned(reader), entity_resolver_factory)
+    }
+
+    /// Returns event which, if possible, would borrow from the source and contains
+    /// a copy of data if borrowing is impossible (for example, event from another
+    /// document resolved by entity reference).
+    pub fn read_event(&mut self) -> Result<XmlEvent<'i>, Error> {
+        while let Some(unit) = self.units.back_mut() {
+            self.buffer.clear();
+            match unit.read_event(&mut self.buffer)? {
+                ReadEvent::ExternalEntity(reader) => {
+                    self.units.push_back(StorageUnit::new(
+                        EntityReader::External(reader),
+                        self.entity_resolver_factory.new_resolver(),
+                    ));
+                    continue;
+                }
+                ReadEvent::Event(XmlEvent::Eof) => {
+                    self.units.pop_back();
+                    continue;
+                }
+                ReadEvent::Event(event) => return Ok(event),
+                _ => continue,
+            }
+        }
+        Ok(XmlEvent::Eof)
+    }
+}
+
+/// This is an implementation for reading from a `&[u8]` as underlying byte stream.
+/// This implementation supports not using an intermediate buffer as the byte slice
+/// itself can be used to borrow from.
+impl<'i, 'e> XmlReader<'i, 'e, PredefinedEntityResolver> {
+    /// Creates an XML reader from a string slice.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(source: &'i str) -> Self {
+        Self::borrowed(Reader::from_str(source), PredefinedEntityResolver)
     }
 }
 
