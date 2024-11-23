@@ -2107,7 +2107,6 @@ pub use self::attributes::AttributesDeserializer;
 pub use self::resolver::{EntityResolver, PredefinedEntityResolver};
 pub use self::simple_type::SimpleTypeDeserializer;
 pub use crate::errors::serialize::DeError;
-use crate::XmlVersion;
 
 use crate::{
     de::map::ElementMapAccess,
@@ -2313,9 +2312,9 @@ pub enum PayloadEvent<'a> {
 /// An intermediate reader that consumes [`PayloadEvent`]s and produces final [`DeEvent`]s.
 /// [`PayloadEvent::Text`] events, that followed by any event except
 /// [`PayloadEvent::Text`] or [`PayloadEvent::CData`], are trimmed from the end.
-struct LookaheadReader<'i, R: XmlRead<'i>, E: EntityResolver = PredefinedEntityResolver> {
+struct LookaheadReader<'i, 'e, E: EntityResolver = PredefinedEntityResolver> {
     /// A source of low-level XML events
-    reader: R,
+    reader: XmlReader<'i, 'e>,
     /// Intermediate event, that could be returned by the next call to `next()`.
     /// If that is the `Text` event then leading spaces already trimmed, but
     /// trailing spaces is not. Before the event will be returned, trimming of
@@ -2329,8 +2328,8 @@ struct LookaheadReader<'i, R: XmlRead<'i>, E: EntityResolver = PredefinedEntityR
     entity_resolver: E,
 }
 
-impl<'i, R: XmlRead<'i>, E: EntityResolver> LookaheadReader<'i, R, E> {
-    fn new(mut reader: R, entity_resolver: E) -> Self {
+impl<'i, 'e, E: EntityResolver> LookaheadReader<'i, 'e, E> {
+    fn new(mut reader: XmlReader<'i, 'e>, entity_resolver: E) -> Self {
         // Lookahead by one event immediately, so we do not need to check in the
         // loop if we need lookahead or not
         let lookahead = reader.next();
@@ -2501,12 +2500,9 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A structure that deserializes XML into Rust values.
-pub struct Deserializer<'de, R, E: EntityResolver = PredefinedEntityResolver>
-where
-    R: XmlRead<'de>,
-{
+pub struct Deserializer<'de, 'e, E: EntityResolver = PredefinedEntityResolver> {
     /// An XML reader that streams events into this deserializer
-    reader: LookaheadReader<'de, R, E>,
+    reader: LookaheadReader<'de, 'e, E>,
 
     /// When deserializing sequences sometimes we have to skip unwanted events.
     /// That events should be stored and then replayed. This is a replay buffer,
@@ -2539,9 +2535,8 @@ where
     key_buf: String,
 }
 
-impl<'de, R, E> Deserializer<'de, R, E>
+impl<'de, 'e, E> Deserializer<'de, 'e, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
     /// Create an XML deserializer from one of the possible quick_xml input sources.
@@ -2550,7 +2545,7 @@ where
     ///
     ///  - [`Deserializer::from_str`]
     ///  - [`Deserializer::from_reader`]
-    fn new(reader: R, entity_resolver: E) -> Self {
+    fn new(reader: XmlReader<'de, 'e>, entity_resolver: E) -> Self {
         Self {
             reader: LookaheadReader::new(reader, entity_resolver),
 
@@ -2610,7 +2605,7 @@ where
     /// assert_eq!(reader.error_position(), 28);
     /// assert_eq!(reader.buffer_position(), 41);
     /// ```
-    pub const fn get_ref(&self) -> &R {
+    pub const fn get_ref(&self) -> &XmlReader<'de, 'e> {
         &self.reader.reader
     }
 
@@ -2990,7 +2985,7 @@ where
     }
 }
 
-impl<'de, 'e> Deserializer<'de, XmlReader<'de, 'e>> {
+impl<'de, 'e> Deserializer<'de, 'e> {
     /// Create a new deserializer that will borrow data from the specified string.
     ///
     /// Deserializer created with this method will not resolve custom entities.
@@ -3039,7 +3034,7 @@ impl<'de, 'e> Deserializer<'de, XmlReader<'de, 'e>> {
     }
 }
 
-impl<'de, 'e, E> Deserializer<'de, XmlReader<'de, 'e>, E>
+impl<'de, 'e, E> Deserializer<'de, 'e, E>
 where
     E: EntityResolver,
 {
@@ -3066,7 +3061,7 @@ where
     }
 }
 
-impl<'de, 'e> Deserializer<'de, XmlReader<'de, 'e>> {
+impl<'de, 'e> Deserializer<'de, 'e> {
     /// Create a new deserializer that will copy data from the specified reader
     /// into internal buffer.
     ///
@@ -3126,7 +3121,7 @@ impl<'de, 'e> Deserializer<'de, XmlReader<'de, 'e>> {
     }
 }
 
-impl<'de, 'e, E> Deserializer<'de, XmlReader<'de, 'e>, E>
+impl<'de, 'e, E> Deserializer<'de, 'e, E>
 where
     E: EntityResolver,
 {
@@ -3164,9 +3159,8 @@ where
     }
 }
 
-impl<'de, R, E> de::Deserializer<'de> for &mut Deserializer<'de, R, E>
+impl<'de, 'e, E> de::Deserializer<'de> for &mut Deserializer<'de, 'e, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
     type Error = DeError;
@@ -3304,9 +3298,8 @@ where
 ///
 /// Technically, multiple top-level elements violates XML rule of only one top-level
 /// element, but we consider this as several concatenated XML documents.
-impl<'de, R, E> SeqAccess<'de> for &mut Deserializer<'de, R, E>
+impl<'de, 'e, E> SeqAccess<'de> for &mut Deserializer<'de, 'e, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
     type Error = DeError;
@@ -3331,9 +3324,8 @@ where
     }
 }
 
-impl<'de, R, E> IntoDeserializer<'de, DeError> for &mut Deserializer<'de, R, E>
+impl<'de, 'e, E> IntoDeserializer<'de, DeError> for &mut Deserializer<'de, 'e, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
     type Deserializer = Self;
@@ -3346,34 +3338,7 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Trait used by the deserializer for iterating over input. This is manually
-/// "specialized" for iterating over `&[u8]`.
-///
-/// You do not need to implement this trait, it is needed to abstract from
-/// [borrowing](SliceReader) and [copying](IoReader) data sources and reuse code in
-/// deserializer
-pub trait XmlRead<'i> {
-    /// Return an input-borrowing event.
-    fn next(&mut self) -> Result<PayloadEvent<'i>, DeError>;
-
-    /// Skips until end element is found. Unlike `next()` it will not allocate
-    /// when it cannot satisfy the lifetime.
-    fn read_to_end(&mut self, name: QName) -> Result<(), DeError>;
-
-    /// Return an XML version of the source.
-    fn xml_version(&self) -> XmlVersion;
-
-    /// A copy of the reader's decoder used to decode strings.
-    fn decoder(&self) -> Decoder;
-
-    /// Checks if the `start` tag has a [`xsi:nil`] attribute. This method ignores
-    /// any errors in attributes.
-    ///
-    /// [`xsi:nil`]: https://www.w3.org/TR/xmlschema-1/#xsi_nil
-    fn has_nil_attr(&self, start: &BytesStart) -> bool;
-}
-
-impl<'de, 'e> XmlRead<'de> for XmlReader<'de, 'e> {
+impl<'de, 'e> XmlReader<'de, 'e> {
     fn next(&mut self) -> Result<PayloadEvent<'de>, DeError> {
         loop {
             let event = match self.read_event()? {
@@ -3392,26 +3357,6 @@ impl<'de, 'e> XmlRead<'de> for XmlReader<'de, 'e> {
             return Ok(event);
         }
     }
-
-    fn read_to_end(&mut self, name: QName) -> Result<(), DeError> {
-        match self.read_to_end(name) {
-            Err(e) => Err(e.into()),
-            Ok(_) => Ok(()),
-        }
-    }
-
-    #[inline]
-    fn xml_version(&self) -> XmlVersion {
-        self.xml_version()
-    }
-
-    fn decoder(&self) -> Decoder {
-        self.decoder()
-    }
-
-    fn has_nil_attr(&self, start: &BytesStart) -> bool {
-        self.has_nil_attr(start)
-    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -3422,7 +3367,7 @@ mod tests {
     use crate::errors::IllFormedError;
     use pretty_assertions::assert_eq;
 
-    fn make_de<'de, 'e>(source: &'de str) -> Deserializer<'de, XmlReader<'de, 'e>> {
+    fn make_de<'de, 'e>(source: &'de str) -> Deserializer<'de, 'e> {
         dbg!(source);
         Deserializer::from_str(source)
     }
