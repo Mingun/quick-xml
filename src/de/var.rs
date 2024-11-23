@@ -3,38 +3,35 @@ use crate::{
     de::map::ElementMapAccess,
     de::resolver::EntityResolver,
     de::simple_type::SimpleTypeDeserializer,
-    de::{DeEvent, Deserializer, XmlRead, TEXT_KEY},
+    de::{DeEvent, Deserializer, TEXT_KEY},
     errors::serialize::DeError,
 };
 use serde::de::value::BorrowedStrDeserializer;
 use serde::de::{self, DeserializeSeed, Deserializer as _, Visitor};
 
 /// An enum access
-pub struct EnumAccess<'de, 'd, R, E>
+pub struct EnumAccess<'de, 'e, 'd, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
-    de: &'d mut Deserializer<'de, R, E>,
+    de: &'d mut Deserializer<'de, 'e, E>,
 }
 
-impl<'de, 'd, R, E> EnumAccess<'de, 'd, R, E>
+impl<'de, 'e, 'd, E> EnumAccess<'de, 'e, 'd, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
-    pub fn new(de: &'d mut Deserializer<'de, R, E>) -> Self {
+    pub fn new(de: &'d mut Deserializer<'de, 'e, E>) -> Self {
         EnumAccess { de }
     }
 }
 
-impl<'de, 'd, R, E> de::EnumAccess<'de> for EnumAccess<'de, 'd, R, E>
+impl<'de, 'e, 'd, E> de::EnumAccess<'de> for EnumAccess<'de, 'e, 'd, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
     type Error = DeError;
-    type Variant = VariantAccess<'de, 'd, R, E>;
+    type Variant = VariantAccess<'de, 'e, 'd, E>;
 
     fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
     where
@@ -61,20 +58,18 @@ where
     }
 }
 
-pub struct VariantAccess<'de, 'd, R, E>
+pub struct VariantAccess<'de, 'e, 'd, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
-    de: &'d mut Deserializer<'de, R, E>,
+    de: &'d mut Deserializer<'de, 'e, E>,
     /// `true` if variant should be deserialized from a textual content
     /// and `false` if from tag
     is_text: bool,
 }
 
-impl<'de, 'd, R, E> de::VariantAccess<'de> for VariantAccess<'de, 'd, R, E>
+impl<'de, 'e, 'd, E> de::VariantAccess<'de> for VariantAccess<'de, 'e, 'd, E>
 where
-    R: XmlRead<'de>,
     E: EntityResolver,
 {
     type Error = DeError;
