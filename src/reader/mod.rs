@@ -12,8 +12,8 @@ use std::sync::Arc;
 use crate::encoding::Decoder;
 use crate::errors::{Error, IllFormedError, SyntaxError};
 use crate::escape::{parse_number, EscapeError};
-use crate::events::{BytesRef, BytesText, Event};
-use crate::name::NamespaceResolver;
+use crate::events::{BytesRef, BytesStart, BytesText, Event};
+use crate::name::{NamespaceResolver, QName};
 use crate::parser::{DtdParser, ElementParser, Parser, PiParser};
 use crate::reader::state::ReaderState;
 use crate::XmlVersion;
@@ -1323,6 +1323,14 @@ impl<'i, 'e> EntityReader<'i, 'e> {
             Self::External(r) => Ok(r.read_event_into(buf)?.into_owned()),
         }
     }
+
+    fn read_to_end(&mut self, end: QName, buf: &mut Vec<u8>) -> Result<Span, Error> {
+        match self {
+            EntityReader::InternalBorrowed(r) => r.read_to_end(end),
+            EntityReader::InternalOwned(r) => r.read_to_end_into(end, buf),
+            EntityReader::External(r) => r.read_to_end_into(end, buf),
+        }
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1494,6 +1502,31 @@ where
             e => e,
         }
     }
+
+    fn read_to_end(&mut self, end: QName, buf: &mut Vec<u8>) -> Result<bool, Error> {
+        // FIXME: this is incorrect, because entity reference does not obligated
+        // to properly nested XML tree
+        if let Some(part) = self.parts.back_mut() {
+            part.read_to_end(end, buf)?;
+            // Because we found the end tag and consume it, we should pop any namespaces that
+            // was started by the Start event
+            self.pop();
+            return Ok(true);
+        }
+        Ok(false)
+    }
+
+    fn decoder(&self) -> Decoder {
+        match self.parts.back() {
+            Some(part) => part.decoder(),
+            // Does not matter what decoder to use when all events exhausted
+            None => Decoder::utf8(),
+        }
+    }
+
+    fn has_nil_attr(&self, start: &BytesStart) -> bool {
+        start.attributes().has_nil(&self.ns_resolver)
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -1634,6 +1667,52 @@ where
     pub fn resolver(&self) -> &NamespaceResolver {
         // SAFETY: At least one storage unit should always be there
         &self.units.back().unwrap().ns_resolver
+    }
+
+    /// Reads until end element is found. This function is supposed to be called
+    /// after you already read a [`Event::Start`] event.
+    ///
+    /// Unlike [`Reader::read_to_end`] this method does not return span because
+    /// there might not be continuos space that is occupied by the XML tree.
+    pub fn read_to_end(&mut self, end: QName) -> Result<(), Error> {
+        // FIXME: this is incorrect, because entity reference does not obligated
+        // to properly nested XML tree
+        if let Some(unit) = self.units.back_mut() {
+            unit.read_to_end(end, &mut self.buffer)?;
+            return Ok(());
+        }
+        Err(Error::missed_end(end, Decoder::utf8()))
+    }
+
+    /// Note: version can be changed after reading new event, because new event
+    /// could be produced from another document due to entity resolution.
+    pub fn xml_version(&self) -> XmlVersion {
+        match self.units.back() {
+            Some(unit) => unit.version,
+            // If there no units we assume default XML version
+            None => XmlVersion::V1_0,
+        }
+    }
+
+    /// Note: decoder can be changed after reading new event, because new event
+    /// could be produced from another document due to entity resolution.
+    pub fn decoder(&self) -> Decoder {
+        match self.units.back() {
+            Some(unit) => unit.decoder(),
+            // Does not matter what decoder to use when all events exhausted
+            None => Decoder::utf8(),
+        }
+    }
+
+    /// Checks if the `start` tag has a [`xsi:nil`] attribute. This method ignores
+    /// any errors in attributes.
+    ///
+    /// [`xsi:nil`]: https://www.w3.org/TR/xmlschema-1/#xsi_nil
+    pub fn has_nil_attr(&self, start: &BytesStart) -> bool {
+        match self.units.back() {
+            Some(unit) => unit.has_nil_attr(start),
+            None => false,
+        }
     }
 }
 

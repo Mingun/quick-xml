@@ -2116,7 +2116,7 @@ use crate::{
     escape::{parse_number, EscapeError},
     events::{BytesCData, BytesEnd, BytesRef, BytesStart, BytesText, Event},
     name::QName,
-    reader::NsReader,
+    reader::{NsReader, XmlEvent, XmlReader},
 };
 use serde::de::{
     self, Deserialize, DeserializeOwned, DeserializeSeed, IntoDeserializer, SeqAccess, Visitor,
@@ -3578,6 +3578,49 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
         start.attributes().has_nil(self.reader.resolver())
     }
 }
+
+impl<'de, 'e> XmlRead<'de> for XmlReader<'de, 'e> {
+    fn next(&mut self) -> Result<PayloadEvent<'de>, DeError> {
+        loop {
+            let event = match self.read_event()? {
+                XmlEvent::Start(e) => PayloadEvent::Start(e),
+                XmlEvent::End(e) => PayloadEvent::End(e),
+                XmlEvent::Eof => PayloadEvent::Eof,
+
+                // Do not trim next text event after Text or CDATA
+                XmlEvent::CData(e) => PayloadEvent::CData(e),
+                XmlEvent::Text(e) => PayloadEvent::Text(e),
+
+                // XmlEvent::Empty doesn't produced, because it is expanded into Start+End
+                // Skip XmlEvent::PI
+                _ => continue,
+            };
+            return Ok(event);
+        }
+    }
+
+    fn read_to_end(&mut self, name: QName) -> Result<(), DeError> {
+        match self.read_to_end(name) {
+            Err(e) => Err(e.into()),
+            Ok(_) => Ok(()),
+        }
+    }
+
+    #[inline]
+    fn xml_version(&self) -> XmlVersion {
+        self.xml_version()
+    }
+
+    fn decoder(&self) -> Decoder {
+        self.decoder()
+    }
+
+    fn has_nil_attr(&self, start: &BytesStart) -> bool {
+        self.has_nil_attr(start)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 mod tests {
