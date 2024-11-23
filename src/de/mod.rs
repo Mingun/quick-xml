@@ -2112,8 +2112,7 @@ use crate::{
     de::map::ElementMapAccess,
     encoding::Decoder,
     errors::Error,
-    escape::{parse_number, EscapeError},
-    events::{BytesCData, BytesEnd, BytesRef, BytesStart, BytesText},
+    events::{BytesCData, BytesEnd, BytesStart, BytesText},
     name::QName,
     reader::{NsReader, XmlEvent, XmlReader},
 };
@@ -2301,10 +2300,6 @@ pub enum PayloadEvent<'a> {
     Text(BytesText<'a>),
     /// Unescaped character data stored in `<![CDATA[...]]>`.
     CData(BytesCData<'a>),
-    /// Document type definition data (DTD) stored in `<!DOCTYPE ...>`.
-    DocType(BytesText<'a>),
-    /// Reference `&ref;` in the textual data.
-    GeneralRef(BytesRef<'a>),
     /// End of XML document.
     Eof,
 }
@@ -2365,10 +2360,7 @@ impl<'i, 'e, E: EntityResolver> LookaheadReader<'i, 'e, E> {
         // and `z`, tripping `unreachable!()` in `read_text`.
         !matches!(
             self.lookahead,
-            Ok(PayloadEvent::Text(_)
-                | PayloadEvent::CData(_)
-                | PayloadEvent::GeneralRef(_)
-                | PayloadEvent::DocType(_))
+            Ok(PayloadEvent::Text(_) | PayloadEvent::CData(_))
         )
     }
 
@@ -2395,17 +2387,9 @@ impl<'i, 'e, E: EntityResolver> LookaheadReader<'i, 'e, E> {
                 PayloadEvent::CData(e) => result
                     .to_mut()
                     .push_str(&e.xml_content(self.reader.xml_version())?),
-                PayloadEvent::GeneralRef(e) => self.resolve_reference(result.to_mut(), e)?,
-                PayloadEvent::DocType(e) => {
-                    self.entity_resolver
-                        .capture(e)
-                        .map_err(|err| DeError::Custom(format!("cannot parse DTD: {}", err)))?;
-                }
 
-                // SAFETY: current_event_is_last_text checks that event is Text, CData, GeneralRef, or DocType
-                _ => unreachable!(
-                    "Only `Text`, `CData`, `GeneralRef` or `DocType` events can come here"
-                ),
+                // SAFETY: current_event_is_last_text checks that event is Text or CData
+                _ => unreachable!("Only `Text` or `CData` events can come here"),
             }
         }
         Ok(DeEvent::Text(Text::new(result)))
@@ -2421,36 +2405,9 @@ impl<'i, 'e, E: EntityResolver> LookaheadReader<'i, 'e, E> {
                 PayloadEvent::CData(e) => {
                     self.drain_text(e.xml_content(self.reader.xml_version())?)
                 }
-                PayloadEvent::DocType(e) => {
-                    self.entity_resolver
-                        .capture(e)
-                        .map_err(|err| DeError::Custom(format!("cannot parse DTD: {}", err)))?;
-                    continue;
-                }
-                PayloadEvent::GeneralRef(e) => {
-                    let mut text = String::new();
-                    self.resolve_reference(&mut text, e)?;
-                    self.drain_text(text.into())
-                }
                 PayloadEvent::Eof => Ok(DeEvent::Eof),
             };
         }
-    }
-
-    fn resolve_reference(&mut self, result: &mut String, event: BytesRef) -> Result<(), DeError> {
-        let len = event.len();
-        let reference = self.decoder().decode(&event)?;
-
-        if let Some(num) = reference.strip_prefix('#') {
-            let codepoint = parse_number(num).map_err(EscapeError::InvalidCharRef)?;
-            result.push_str(codepoint.encode_utf8(&mut [0u8; 4]));
-            return Ok(());
-        }
-        if let Some(value) = self.entity_resolver.resolve(reference.as_ref()) {
-            result.push_str(value);
-            return Ok(());
-        }
-        Err(EscapeError::UnrecognizedEntity(0..len, reference.to_string()).into())
     }
 
     #[inline]
