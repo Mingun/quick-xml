@@ -1831,20 +1831,31 @@ mod borrow {
 mod resolve {
     use super::*;
     use pretty_assertions::assert_eq;
-    use quick_xml::de::EntityResolver;
     use quick_xml::events::BytesText;
+    use quick_xml::reader::{EntityResolver, EntityResolverFactory, ReplacementText};
+    use std::borrow::Cow;
     use std::collections::BTreeMap;
     use std::convert::Infallible;
     use std::iter::FromIterator;
 
+    #[derive(Clone, Copy)]
     struct TestEntityResolver {
         capture_called: bool,
     }
 
-    impl EntityResolver for TestEntityResolver {
-        type Error = Infallible;
+    impl<'i> EntityResolverFactory<'i> for TestEntityResolver {
+        type CaptureError = Infallible;
+        type Resolver = Self;
 
-        fn capture(&mut self, doctype: BytesText) -> Result<(), Self::Error> {
+        fn new_resolver(&mut self) -> Self::Resolver {
+            *self
+        }
+    }
+
+    impl<'i> EntityResolver<'i> for TestEntityResolver {
+        type CaptureError = Infallible;
+
+        fn capture(&mut self, doctype: BytesText) -> Result<(), Self::CaptureError> {
             self.capture_called = true;
 
             assert_eq!(doctype.as_ref(), br#"dict[ <!ENTITY unc "unclassified"> ]"#);
@@ -1852,14 +1863,14 @@ mod resolve {
             Ok(())
         }
 
-        fn resolve(&self, entity: &str) -> Option<&str> {
+        fn resolve<'e>(&self, entity: &str) -> Option<ReplacementText<'i, 'e>> {
             assert!(
                 self.capture_called,
                 "`EntityResolver::capture` should be called before `EntityResolver::resolve`"
             );
             match entity {
-                "t1" => Some("test_one"),
-                "t2" => Some("test_two"),
+                "t1" => Some(ReplacementText::Internal(Cow::Borrowed(b"test_one"))),
+                "t2" => Some(ReplacementText::Internal(Cow::Borrowed(b"test_two"))),
                 _ => None,
             }
         }

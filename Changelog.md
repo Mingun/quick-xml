@@ -16,6 +16,8 @@
 
 The new `XmlReader` type was added that is automatically resolves general entity references.
 
+`quick_xml::de::resolver` was replaced by `quick_xml::resolver` module.
+
 ### New Features
 
 - [#948]: Add `quick_xml::reader::EntityResolver` which is able to resolve external entities.
