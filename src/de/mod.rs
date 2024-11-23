@@ -125,8 +125,8 @@
 //! </div>
 //! <!-- TODO: document an error type returned -->
 //!
-//! [text]: Event::Text
-//! [CDATA]: Event::CData
+//! [text]: crate::events::Event::Text
+//! [CDATA]: crate::events::Event::CData
 //! </td>
 //! </tr>
 //! <!-- 2 ===================================================================================== -->
@@ -2114,7 +2114,7 @@ use crate::{
     encoding::Decoder,
     errors::Error,
     escape::{parse_number, EscapeError},
-    events::{BytesCData, BytesEnd, BytesRef, BytesStart, BytesText, Event},
+    events::{BytesCData, BytesEnd, BytesRef, BytesStart, BytesText},
     name::QName,
     reader::{NsReader, XmlEvent, XmlReader},
 };
@@ -2148,17 +2148,17 @@ const fn is_non_whitespace(ch: char) -> bool {
 /// Internally text is stored in `Cow<str>`. Cloning of text is cheap while it
 /// is borrowed and makes copies of data when it is owned.
 ///
-/// [`Text`]: Event::Text
-/// [`CData`]: Event::CData
-/// [`Comment`]: Event::Comment
-/// [`PI`]: Event::PI
+/// [`Text`]: crate::events::Event::Text
+/// [`CData`]: crate::events::Event::CData
+/// [`Comment`]: crate::events::Event::Comment
+/// [`PI`]: crate::events::Event::PI
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Text<'a> {
     /// Untrimmed text after concatenating content of all
     /// [`Text`] and [`CData`] events
     ///
-    /// [`Text`]: Event::Text
-    /// [`CData`]: Event::CData
+    /// [`Text`]: crate::events::Event::Text
+    /// [`CData`]: crate::events::Event::CData
     text: Cow<'a, str>,
     /// A range into `text` which contains data after trimming
     content: Range<usize>,
@@ -2270,10 +2270,10 @@ pub enum DeEvent<'a> {
     /// events. _Consequent_ means that events should follow each other or be
     /// delimited only by (any count of) [`Comment`] or [`PI`] events.
     ///
-    /// [`Text`]: Event::Text
-    /// [`CData`]: Event::CData
-    /// [`Comment`]: Event::Comment
-    /// [`PI`]: Event::PI
+    /// [`Text`]: crate::events::Event::Text
+    /// [`CData`]: crate::events::Event::CData
+    /// [`Comment`]: crate::events::Event::Comment
+    /// [`PI`]: crate::events::Event::PI
     Text(Text<'a>),
     /// End of XML document.
     Eof,
@@ -2290,8 +2290,8 @@ pub enum DeEvent<'a> {
 /// end spaces we should lookahead by one deserializer event (i. e. skip all
 /// comments and processing instructions).
 ///
-/// [`Text`]: Event::Text
-/// [`CData`]: Event::CData
+/// [`Text`]: crate::events::Event::Text
+/// [`CData`]: crate::events::Event::CData
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PayloadEvent<'a> {
     /// Start tag (with attributes) `<tag attr="value">`.
@@ -2308,22 +2308,6 @@ pub enum PayloadEvent<'a> {
     GeneralRef(BytesRef<'a>),
     /// End of XML document.
     Eof,
-}
-
-impl<'a> PayloadEvent<'a> {
-    /// Ensures that all data is owned to extend the object's lifetime if necessary.
-    #[inline]
-    fn into_owned(self) -> PayloadEvent<'static> {
-        match self {
-            PayloadEvent::Start(e) => PayloadEvent::Start(e.into_owned()),
-            PayloadEvent::End(e) => PayloadEvent::End(e.into_owned()),
-            PayloadEvent::Text(e) => PayloadEvent::Text(e.into_owned()),
-            PayloadEvent::CData(e) => PayloadEvent::CData(e.into_owned()),
-            PayloadEvent::DocType(e) => PayloadEvent::DocType(e.into_owned()),
-            PayloadEvent::GeneralRef(e) => PayloadEvent::GeneralRef(e.into_owned()),
-            PayloadEvent::Eof => PayloadEvent::Eof,
-        }
-    }
 }
 
 /// An intermediate reader that consumes [`PayloadEvent`]s and produces final [`DeEvent`]s.
@@ -2604,7 +2588,7 @@ where
     /// # use pretty_assertions::assert_eq;
     /// use serde::Deserialize;
     /// use quick_xml::de::Deserializer;
-    /// use quick_xml::NsReader;
+    /// use quick_xml::reader::XmlReader;
     ///
     /// #[derive(Deserialize)]
     /// struct SomeStruct {
@@ -2621,7 +2605,7 @@ where
     /// let err = SomeStruct::deserialize(&mut de);
     /// assert!(err.is_err());
     ///
-    /// let reader: &NsReader<_> = de.get_ref().get_ref();
+    /// let reader: &XmlReader<_> = de.get_ref();
     ///
     /// assert_eq!(reader.error_position(), 28);
     /// assert_eq!(reader.buffer_position(), 41);
@@ -2876,8 +2860,8 @@ where
     /// |[`DeEvent::Text`] |`text content` or `<![CDATA[cdata content]]>` (probably mixed)|Returns event content unchanged, expects the `</tag>` after that
     /// |[`DeEvent::Eof`]  |                           |Emits [`InvalidXml(IllFormed(MissingEndTag))`](DeError::InvalidXml)
     ///
-    /// [`Text`]: Event::Text
-    /// [`CData`]: Event::CData
+    /// [`Text`]: crate::events::Event::Text
+    /// [`CData`]: crate::events::Event::CData
     fn read_string_impl(&mut self, allow_start: bool) -> Result<Cow<'de, str>, DeError> {
         match self.next()? {
             // Reached by doc tests only: this file, lines 979 and 996
@@ -3006,7 +2990,7 @@ where
     }
 }
 
-impl<'de> Deserializer<'de, SliceReader<'de>> {
+impl<'de, 'e> Deserializer<'de, XmlReader<'de, 'e>> {
     /// Create a new deserializer that will borrow data from the specified string.
     ///
     /// Deserializer created with this method will not resolve custom entities.
@@ -3055,7 +3039,7 @@ impl<'de> Deserializer<'de, SliceReader<'de>> {
     }
 }
 
-impl<'de, E> Deserializer<'de, SliceReader<'de>, E>
+impl<'de, 'e, E> Deserializer<'de, XmlReader<'de, 'e>, E>
 where
     E: EntityResolver,
 {
@@ -3076,19 +3060,13 @@ where
         config.expand_empty_elements = true;
 
         Self::new(
-            SliceReader {
-                reader,
-                version: XmlVersion::V1_0,
-            },
+            XmlReader::borrowed_ns(reader, crate::reader::PredefinedEntityResolver),
             entity_resolver,
         )
     }
 }
 
-impl<'de, R> Deserializer<'de, IoReader<R>>
-where
-    R: BufRead,
-{
+impl<'de, 'e> Deserializer<'de, XmlReader<'de, 'e>> {
     /// Create a new deserializer that will copy data from the specified reader
     /// into internal buffer.
     ///
@@ -3097,7 +3075,10 @@ where
     /// UTF-8, you can decode it first before using [`from_str`].
     ///
     /// Deserializer created with this method will not resolve custom entities.
-    pub fn from_reader(reader: R) -> Self {
+    pub fn from_reader<R>(reader: R) -> Self
+    where
+        R: BufRead + 'de,
+    {
         Self::with_resolver(reader, PredefinedEntityResolver)
     }
 
@@ -3115,18 +3096,22 @@ where
     /// # use quick_xml::de::Deserializer;
     /// # use quick_xml::NsReader;
     /// # use serde::Deserialize;
-    /// #
+    /// use std::io::{BufRead, Cursor};
+    ///
     /// #[derive(Deserialize, PartialEq, Debug)]
     /// struct Object {
     ///     tag: String,
     /// }
     ///
-    /// let mut reader = NsReader::from_str("<xml><tag>    test    </tag></xml>");
+    /// let boxed: Box<dyn BufRead> = Box::new(Cursor::new("<xml><tag>    test    </tag></xml>"));
+    /// let mut reader = NsReader::from_reader(boxed);
     ///
-    /// let mut de = Deserializer::buffering(reader.clone());
+    /// let mut de = Deserializer::buffering(reader);
     /// let obj = Object::deserialize(&mut de).unwrap();
     /// assert_eq!(obj, Object { tag: "    test    ".to_string() });
     ///
+    /// let boxed: Box<dyn BufRead> = Box::new(Cursor::new("<xml><tag>    test    </tag></xml>"));
+    /// let mut reader = NsReader::from_reader(boxed);
     /// reader.config_mut().trim_text(true);
     ///
     /// let mut de = Deserializer::buffering(reader);
@@ -3136,14 +3121,13 @@ where
     ///
     /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
     #[inline]
-    pub fn buffering(reader: NsReader<R>) -> Self {
+    pub fn buffering(reader: NsReader<Box<dyn BufRead + 'de>>) -> Self {
         Self::buffering_with_resolver(reader, PredefinedEntityResolver)
     }
 }
 
-impl<'de, R, E> Deserializer<'de, IoReader<R>, E>
+impl<'de, 'e, E> Deserializer<'de, XmlReader<'de, 'e>, E>
 where
-    R: BufRead,
     E: EntityResolver,
 {
     /// Create a new deserializer that will copy data from the specified reader
@@ -3152,19 +3136,12 @@ where
     /// If you already have a string use [`Self::from_str`] instead, because it
     /// will borrow instead of copy. If you have `&[u8]` which is known to represent
     /// UTF-8, you can decode it first before using [`from_str`].
-    pub fn with_resolver(reader: R, entity_resolver: E) -> Self {
-        let mut reader = NsReader::from_reader(reader);
-        let config = reader.config_mut();
-        config.expand_empty_elements = true;
-
-        Self::new(
-            IoReader {
-                reader,
-                buf: Vec::new(),
-                version: XmlVersion::V1_0,
-            },
-            entity_resolver,
-        )
+    pub fn with_resolver<R>(reader: R, entity_resolver: E) -> Self
+    where
+        R: BufRead + 'de,
+    {
+        let boxed: Box<dyn BufRead + 'de> = Box::new(reader);
+        Self::buffering_with_resolver(NsReader::from_reader(boxed), entity_resolver)
     }
 
     /// Create new deserializer that will copy data from the specified preconfigured reader
@@ -3173,16 +3150,15 @@ where
     /// Note, that config option [`Config::expand_empty_elements`] will be set to `true`.
     ///
     /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
-    pub fn buffering_with_resolver(mut reader: NsReader<R>, entity_resolver: E) -> Self {
+    pub fn buffering_with_resolver(
+        mut reader: NsReader<Box<dyn BufRead + 'de>>,
+        entity_resolver: E,
+    ) -> Self {
         let config = reader.config_mut();
         config.expand_empty_elements = true;
 
         Self::new(
-            IoReader {
-                reader,
-                buf: Vec::new(),
-                version: XmlVersion::V1_0,
-            },
+            XmlReader::buffered_ns(reader, crate::reader::PredefinedEntityResolver),
             entity_resolver,
         )
     }
@@ -3370,28 +3346,6 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// Converts raw reader's event into a payload event.
-/// Returns `None`, if event should be skipped.
-#[inline(always)]
-fn skip_uninterested<'a>(event: Event<'a>) -> Option<PayloadEvent<'a>> {
-    let event = match event {
-        Event::DocType(e) => PayloadEvent::DocType(e),
-        Event::Start(e) => PayloadEvent::Start(e),
-        Event::End(e) => PayloadEvent::End(e),
-        Event::Eof => PayloadEvent::Eof,
-
-        // Do not trim next text event after Text, CDATA or reference event
-        Event::CData(e) => PayloadEvent::CData(e),
-        Event::Text(e) => PayloadEvent::Text(e),
-        Event::GeneralRef(e) => PayloadEvent::GeneralRef(e),
-
-        _ => return None,
-    };
-    Some(event)
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 /// Trait used by the deserializer for iterating over input. This is manually
 /// "specialized" for iterating over `&[u8]`.
 ///
@@ -3417,166 +3371,6 @@ pub trait XmlRead<'i> {
     ///
     /// [`xsi:nil`]: https://www.w3.org/TR/xmlschema-1/#xsi_nil
     fn has_nil_attr(&self, start: &BytesStart) -> bool;
-}
-
-/// XML input source that reads from a std::io input stream.
-///
-/// You cannot create it, it is created automatically when you call
-/// [`Deserializer::from_reader`]
-pub struct IoReader<R: BufRead> {
-    reader: NsReader<R>,
-    buf: Vec<u8>,
-    version: XmlVersion,
-}
-
-impl<R: BufRead> IoReader<R> {
-    /// Returns the underlying XML reader.
-    ///
-    /// ```
-    /// # use pretty_assertions::assert_eq;
-    /// use serde::Deserialize;
-    /// use std::io::Cursor;
-    /// use quick_xml::de::Deserializer;
-    /// use quick_xml::NsReader;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct SomeStruct {
-    ///     field1: String,
-    ///     field2: String,
-    /// }
-    ///
-    /// // Try to deserialize from broken XML
-    /// let mut de = Deserializer::from_reader(Cursor::new(
-    ///     "<SomeStruct><field1><field2></SomeStruct>"
-    /// //   0                           ^= 28        ^= 41
-    /// ));
-    ///
-    /// let err = SomeStruct::deserialize(&mut de);
-    /// assert!(err.is_err());
-    ///
-    /// let reader: &NsReader<Cursor<&str>> = de.get_ref().get_ref();
-    ///
-    /// assert_eq!(reader.error_position(), 28);
-    /// assert_eq!(reader.buffer_position(), 41);
-    /// ```
-    pub const fn get_ref(&self) -> &NsReader<R> {
-        &self.reader
-    }
-}
-
-impl<'i, R: BufRead> XmlRead<'i> for IoReader<R> {
-    fn next(&mut self) -> Result<PayloadEvent<'static>, DeError> {
-        loop {
-            self.buf.clear();
-
-            let event = self.reader.read_event_into(&mut self.buf)?;
-            if let Event::Decl(e) = &event {
-                self.version = e.xml_version()?;
-            }
-            if let Some(event) = skip_uninterested(event) {
-                return Ok(event.into_owned());
-            }
-        }
-    }
-
-    fn read_to_end(&mut self, name: QName) -> Result<(), DeError> {
-        match self.reader.read_to_end_into(name, &mut self.buf) {
-            Err(e) => Err(e.into()),
-            Ok(_) => Ok(()),
-        }
-    }
-
-    #[inline]
-    fn xml_version(&self) -> XmlVersion {
-        self.version
-    }
-
-    #[inline]
-    fn decoder(&self) -> Decoder {
-        self.reader.decoder()
-    }
-
-    fn has_nil_attr(&self, start: &BytesStart) -> bool {
-        start.attributes().has_nil(self.reader.resolver())
-    }
-}
-
-/// XML input source that reads from a slice of bytes and can borrow from it.
-///
-/// You cannot create it, it is created automatically when you call
-/// [`Deserializer::from_str`].
-pub struct SliceReader<'de> {
-    reader: NsReader<&'de [u8]>,
-    version: XmlVersion,
-}
-
-impl<'de> SliceReader<'de> {
-    /// Returns the underlying XML reader.
-    ///
-    /// ```
-    /// # use pretty_assertions::assert_eq;
-    /// use serde::Deserialize;
-    /// use quick_xml::de::Deserializer;
-    /// use quick_xml::NsReader;
-    ///
-    /// #[derive(Deserialize)]
-    /// struct SomeStruct {
-    ///     field1: String,
-    ///     field2: String,
-    /// }
-    ///
-    /// // Try to deserialize from broken XML
-    /// let mut de = Deserializer::from_str(
-    ///     "<SomeStruct><field1><field2></SomeStruct>"
-    /// //   0                           ^= 28        ^= 41
-    /// );
-    ///
-    /// let err = SomeStruct::deserialize(&mut de);
-    /// assert!(err.is_err());
-    ///
-    /// let reader: &NsReader<&[u8]> = de.get_ref().get_ref();
-    ///
-    /// assert_eq!(reader.error_position(), 28);
-    /// assert_eq!(reader.buffer_position(), 41);
-    /// ```
-    pub const fn get_ref(&self) -> &NsReader<&'de [u8]> {
-        &self.reader
-    }
-}
-
-impl<'de> XmlRead<'de> for SliceReader<'de> {
-    fn next(&mut self) -> Result<PayloadEvent<'de>, DeError> {
-        loop {
-            let event = self.reader.read_event()?;
-            if let Event::Decl(e) = &event {
-                self.version = e.xml_version()?;
-            }
-            if let Some(event) = skip_uninterested(event) {
-                return Ok(event);
-            }
-        }
-    }
-
-    fn read_to_end(&mut self, name: QName) -> Result<(), DeError> {
-        match self.reader.read_to_end(name) {
-            Err(e) => Err(e.into()),
-            Ok(_) => Ok(()),
-        }
-    }
-
-    #[inline]
-    fn xml_version(&self) -> XmlVersion {
-        self.version
-    }
-
-    #[inline]
-    fn decoder(&self) -> Decoder {
-        self.reader.decoder()
-    }
-
-    fn has_nil_attr(&self, start: &BytesStart) -> bool {
-        start.attributes().has_nil(self.reader.resolver())
-    }
 }
 
 impl<'de, 'e> XmlRead<'de> for XmlReader<'de, 'e> {
@@ -3628,7 +3422,7 @@ mod tests {
     use crate::errors::IllFormedError;
     use pretty_assertions::assert_eq;
 
-    fn make_de<'de>(source: &'de str) -> Deserializer<'de, SliceReader<'de>> {
+    fn make_de<'de, 'e>(source: &'de str) -> Deserializer<'de, XmlReader<'de, 'e>> {
         dbg!(source);
         Deserializer::from_str(source)
     }
@@ -4194,36 +3988,6 @@ mod tests {
     }
 
     #[test]
-    fn borrowing_reader_parity() {
-        let s = r#"
-            <item name="hello" source="world.rs">Some text</item>
-            <item2/>
-            <item3 value="world" />
-        "#;
-
-        let mut reader1 = IoReader {
-            reader: NsReader::from_reader(s.as_bytes()),
-            buf: Vec::new(),
-            version: XmlVersion::V1_0,
-        };
-        let mut reader2 = SliceReader {
-            reader: NsReader::from_str(s),
-            version: XmlVersion::V1_0,
-        };
-
-        loop {
-            let event1 = reader1.next().unwrap();
-            let event2 = reader2.next().unwrap();
-
-            if let (PayloadEvent::Eof, PayloadEvent::Eof) = (&event1, &event2) {
-                break;
-            }
-
-            assert_eq!(event1, event2);
-        }
-    }
-
-    #[test]
     fn borrowing_reader_events() {
         let s = r#"
             <item name="hello" source="world.rs">Some text</item>
@@ -4232,13 +3996,10 @@ mod tests {
             <item4 value="world" />
         "#;
 
-        let mut reader = SliceReader {
-            reader: NsReader::from_str(s),
-            version: XmlVersion::V1_0,
-        };
+        let mut reader = NsReader::from_str(s);
+        reader.config_mut().expand_empty_elements = true;
 
-        let config = reader.reader.config_mut();
-        config.expand_empty_elements = true;
+        let mut reader = XmlReader::borrowed_ns(reader, crate::reader::PredefinedEntityResolver);
 
         let mut events = Vec::new();
 
