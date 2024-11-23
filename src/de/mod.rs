@@ -2098,13 +2098,11 @@ macro_rules! deserialize_primitives {
 mod attributes;
 mod key;
 mod map;
-mod resolver;
 mod simple_type;
 mod text;
 mod var;
 
 pub use self::attributes::AttributesDeserializer;
-pub use self::resolver::{EntityResolver, PredefinedEntityResolver};
 pub use self::simple_type::SimpleTypeDeserializer;
 pub use crate::errors::serialize::DeError;
 
@@ -2114,7 +2112,7 @@ use crate::{
     errors::Error,
     events::{BytesCData, BytesEnd, BytesStart, BytesText},
     name::QName,
-    reader::{NsReader, XmlEvent, XmlReader},
+    reader::{EntityResolverFactory, NsReader, PredefinedEntityResolver, XmlEvent, XmlReader},
 };
 use serde::de::{
     self, Deserialize, DeserializeOwned, DeserializeSeed, IntoDeserializer, SeqAccess, Visitor,
@@ -2307,33 +2305,23 @@ pub enum PayloadEvent<'a> {
 /// An intermediate reader that consumes [`PayloadEvent`]s and produces final [`DeEvent`]s.
 /// [`PayloadEvent::Text`] events, that followed by any event except
 /// [`PayloadEvent::Text`] or [`PayloadEvent::CData`], are trimmed from the end.
-struct LookaheadReader<'i, 'e, E: EntityResolver = PredefinedEntityResolver> {
+struct LookaheadReader<'i, 'e, EF: EntityResolverFactory<'i> = PredefinedEntityResolver> {
     /// A source of low-level XML events
-    reader: XmlReader<'i, 'e>,
+    reader: XmlReader<'i, 'e, EF>,
     /// Intermediate event, that could be returned by the next call to `next()`.
     /// If that is the `Text` event then leading spaces already trimmed, but
     /// trailing spaces is not. Before the event will be returned, trimming of
     /// the spaces could be necessary
     lookahead: Result<PayloadEvent<'i>, DeError>,
-
-    /// Used to resolve unknown entities that would otherwise cause the parser
-    /// to return an [`EscapeError::UnrecognizedEntity`] error.
-    ///
-    /// [`EscapeError::UnrecognizedEntity`]: crate::escape::EscapeError::UnrecognizedEntity
-    entity_resolver: E,
 }
 
-impl<'i, 'e, E: EntityResolver> LookaheadReader<'i, 'e, E> {
-    fn new(mut reader: XmlReader<'i, 'e>, entity_resolver: E) -> Self {
+impl<'i, 'e, EF: EntityResolverFactory<'i>> LookaheadReader<'i, 'e, EF> {
+    fn new(mut reader: XmlReader<'i, 'e, EF>) -> Self {
         // Lookahead by one event immediately, so we do not need to check in the
         // loop if we need lookahead or not
         let lookahead = reader.next();
 
-        Self {
-            reader,
-            lookahead,
-            entity_resolver,
-        }
+        Self { reader, lookahead }
     }
 
     /// Returns `true` if all events was consumed
@@ -2467,9 +2455,9 @@ where
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// A structure that deserializes XML into Rust values.
-pub struct Deserializer<'de, 'e, E: EntityResolver = PredefinedEntityResolver> {
+pub struct Deserializer<'de, 'e, EF: EntityResolverFactory<'de> = PredefinedEntityResolver> {
     /// An XML reader that streams events into this deserializer
-    reader: LookaheadReader<'de, 'e, E>,
+    reader: LookaheadReader<'de, 'e, EF>,
 
     /// When deserializing sequences sometimes we have to skip unwanted events.
     /// That events should be stored and then replayed. This is a replay buffer,
@@ -2502,9 +2490,9 @@ pub struct Deserializer<'de, 'e, E: EntityResolver = PredefinedEntityResolver> {
     key_buf: String,
 }
 
-impl<'de, 'e, E> Deserializer<'de, 'e, E>
+impl<'de, 'e, EF> Deserializer<'de, 'e, EF>
 where
-    E: EntityResolver,
+    EF: EntityResolverFactory<'de>,
 {
     /// Create an XML deserializer from one of the possible quick_xml input sources.
     ///
@@ -2512,9 +2500,9 @@ where
     ///
     ///  - [`Deserializer::from_str`]
     ///  - [`Deserializer::from_reader`]
-    fn new(reader: XmlReader<'de, 'e>, entity_resolver: E) -> Self {
+    fn new(reader: XmlReader<'de, 'e, EF>) -> Self {
         Self {
-            reader: LookaheadReader::new(reader, entity_resolver),
+            reader: LookaheadReader::new(reader),
 
             #[cfg(feature = "overlapped-lists")]
             read: VecDeque::new(),
@@ -2572,7 +2560,7 @@ where
     /// assert_eq!(reader.error_position(), 28);
     /// assert_eq!(reader.buffer_position(), 41);
     /// ```
-    pub const fn get_ref(&self) -> &XmlReader<'de, 'e> {
+    pub const fn get_ref(&self) -> &XmlReader<'de, 'e, EF> {
         &self.reader.reader
     }
 
@@ -3001,14 +2989,14 @@ impl<'de, 'e> Deserializer<'de, 'e> {
     }
 }
 
-impl<'de, 'e, E> Deserializer<'de, 'e, E>
+impl<'de, 'e, EF> Deserializer<'de, 'e, EF>
 where
-    E: EntityResolver,
+    EF: EntityResolverFactory<'de>,
 {
     /// Create a new deserializer that will borrow data from the specified string
     /// and use the specified entity resolver.
-    pub fn from_str_with_resolver(source: &'de str, entity_resolver: E) -> Self {
-        Self::borrowing_with_resolver(NsReader::from_str(source), entity_resolver)
+    pub fn from_str_with_resolver(source: &'de str, entity_resolver_factory: EF) -> Self {
+        Self::borrowing_with_resolver(NsReader::from_str(source), entity_resolver_factory)
     }
 
     /// Create a new deserializer that will borrow data from the specified preconfigured
@@ -3017,14 +3005,14 @@ where
     /// Note, that config option [`Config::expand_empty_elements`] will be set to `true`.
     ///
     /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
-    pub fn borrowing_with_resolver(mut reader: NsReader<&'de [u8]>, entity_resolver: E) -> Self {
+    pub fn borrowing_with_resolver(
+        mut reader: NsReader<&'de [u8]>,
+        entity_resolver_factory: EF,
+    ) -> Self {
         let config = reader.config_mut();
         config.expand_empty_elements = true;
 
-        Self::new(
-            XmlReader::borrowed_ns(reader, crate::reader::PredefinedEntityResolver),
-            entity_resolver,
-        )
+        Self::new(XmlReader::borrowed_ns(reader, entity_resolver_factory))
     }
 }
 
@@ -3088,9 +3076,9 @@ impl<'de, 'e> Deserializer<'de, 'e> {
     }
 }
 
-impl<'de, 'e, E> Deserializer<'de, 'e, E>
+impl<'de, 'e, EF> Deserializer<'de, 'e, EF>
 where
-    E: EntityResolver,
+    EF: EntityResolverFactory<'de>,
 {
     /// Create a new deserializer that will copy data from the specified reader
     /// into internal buffer and use the specified entity resolver.
@@ -3098,12 +3086,12 @@ where
     /// If you already have a string use [`Self::from_str`] instead, because it
     /// will borrow instead of copy. If you have `&[u8]` which is known to represent
     /// UTF-8, you can decode it first before using [`from_str`].
-    pub fn with_resolver<R>(reader: R, entity_resolver: E) -> Self
+    pub fn with_resolver<R>(reader: R, entity_resolver_factory: EF) -> Self
     where
         R: BufRead + 'de,
     {
         let boxed: Box<dyn BufRead + 'de> = Box::new(reader);
-        Self::buffering_with_resolver(NsReader::from_reader(boxed), entity_resolver)
+        Self::buffering_with_resolver(NsReader::from_reader(boxed), entity_resolver_factory)
     }
 
     /// Create new deserializer that will copy data from the specified preconfigured reader
@@ -3114,21 +3102,18 @@ where
     /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
     pub fn buffering_with_resolver(
         mut reader: NsReader<Box<dyn BufRead + 'de>>,
-        entity_resolver: E,
+        entity_resolver_factory: EF,
     ) -> Self {
         let config = reader.config_mut();
         config.expand_empty_elements = true;
 
-        Self::new(
-            XmlReader::buffered_ns(reader, crate::reader::PredefinedEntityResolver),
-            entity_resolver,
-        )
+        Self::new(XmlReader::buffered_ns(reader, entity_resolver_factory))
     }
 }
 
-impl<'de, 'e, E> de::Deserializer<'de> for &mut Deserializer<'de, 'e, E>
+impl<'de, 'e, EF> de::Deserializer<'de> for &mut Deserializer<'de, 'e, EF>
 where
-    E: EntityResolver,
+    EF: EntityResolverFactory<'de>,
 {
     type Error = DeError;
 
@@ -3265,9 +3250,9 @@ where
 ///
 /// Technically, multiple top-level elements violates XML rule of only one top-level
 /// element, but we consider this as several concatenated XML documents.
-impl<'de, 'e, E> SeqAccess<'de> for &mut Deserializer<'de, 'e, E>
+impl<'de, 'e, EF> SeqAccess<'de> for &mut Deserializer<'de, 'e, EF>
 where
-    E: EntityResolver,
+    EF: EntityResolverFactory<'de>,
 {
     type Error = DeError;
 
@@ -3291,9 +3276,9 @@ where
     }
 }
 
-impl<'de, 'e, E> IntoDeserializer<'de, DeError> for &mut Deserializer<'de, 'e, E>
+impl<'de, 'e, EF> IntoDeserializer<'de, DeError> for &mut Deserializer<'de, 'e, EF>
 where
-    E: EntityResolver,
+    EF: EntityResolverFactory<'de>,
 {
     type Deserializer = Self;
 
@@ -3305,7 +3290,10 @@ where
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-impl<'de, 'e> XmlReader<'de, 'e> {
+impl<'de, 'e, EF> XmlReader<'de, 'e, EF>
+where
+    EF: EntityResolverFactory<'de>,
+{
     fn next(&mut self) -> Result<PayloadEvent<'de>, DeError> {
         loop {
             let event = match self.read_event()? {
@@ -3911,7 +3899,7 @@ mod tests {
         let mut reader = NsReader::from_str(s);
         reader.config_mut().expand_empty_elements = true;
 
-        let mut reader = XmlReader::borrowed_ns(reader, crate::reader::PredefinedEntityResolver);
+        let mut reader = XmlReader::borrowed_ns(reader, PredefinedEntityResolver);
 
         let mut events = Vec::new();
 

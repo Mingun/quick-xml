@@ -16,6 +16,8 @@
 
 The new `XmlReader` type was added that is automatically resolves general entity references.
 
+`quick_xml::de::resolver` was replaced by `quick_xml::resolver` module.
+
 ### New Features
 
 - [#938]: Add new enumeration `XmlVersion` and typified getter `BytesDecl::xml_version()`.
