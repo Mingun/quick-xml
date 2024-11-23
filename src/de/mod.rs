@@ -2494,6 +2494,58 @@ impl<'de, 'e, EF> Deserializer<'de, 'e, EF>
 where
     EF: EntityResolverFactory<'de>,
 {
+    /// Create a new deserializer that will borrow data from the specified string
+    /// and use the specified entity resolver.
+    pub fn from_str_with_resolver(source: &'de str, entity_resolver_factory: EF) -> Self {
+        Self::borrowing_with_resolver(NsReader::from_str(source), entity_resolver_factory)
+    }
+
+    /// Create a new deserializer that will borrow data from the specified preconfigured
+    /// reader and use the specified entity resolver.
+    ///
+    /// Note, that config option [`Config::expand_empty_elements`] will be set to `true`.
+    ///
+    /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
+    pub fn borrowing_with_resolver(
+        mut reader: NsReader<&'de [u8]>,
+        entity_resolver_factory: EF,
+    ) -> Self {
+        let config = reader.config_mut();
+        config.expand_empty_elements = true;
+
+        Self::new(XmlReader::borrowed_ns(reader, entity_resolver_factory))
+    }
+
+    /// Create a new deserializer that will copy data from the specified reader
+    /// into internal buffer and use the specified entity resolver.
+    ///
+    /// If you already have a string use [`Self::from_str`] instead, because it
+    /// will borrow instead of copy. If you have `&[u8]` which is known to represent
+    /// UTF-8, you can decode it first before using [`from_str`].
+    pub fn with_resolver<R>(reader: R, entity_resolver_factory: EF) -> Self
+    where
+        R: BufRead + 'de,
+    {
+        let boxed: Box<dyn BufRead + 'de> = Box::new(reader);
+        Self::buffering_with_resolver(NsReader::from_reader(boxed), entity_resolver_factory)
+    }
+
+    /// Create new deserializer that will copy data from the specified preconfigured reader
+    /// into internal buffer and use the specified entity resolver.
+    ///
+    /// Note, that config option [`Config::expand_empty_elements`] will be set to `true`.
+    ///
+    /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
+    pub fn buffering_with_resolver(
+        mut reader: NsReader<Box<dyn BufRead + 'de>>,
+        entity_resolver_factory: EF,
+    ) -> Self {
+        let config = reader.config_mut();
+        config.expand_empty_elements = true;
+
+        Self::new(XmlReader::buffered_ns(reader, entity_resolver_factory))
+    }
+
     /// Create an XML deserializer from one of the possible quick_xml input sources.
     ///
     /// Typically it is more convenient to use one of these methods instead:
@@ -2987,36 +3039,7 @@ impl<'de, 'e> Deserializer<'de, 'e> {
     pub fn borrowing(reader: NsReader<&'de [u8]>) -> Self {
         Self::borrowing_with_resolver(reader, PredefinedEntityResolver)
     }
-}
 
-impl<'de, 'e, EF> Deserializer<'de, 'e, EF>
-where
-    EF: EntityResolverFactory<'de>,
-{
-    /// Create a new deserializer that will borrow data from the specified string
-    /// and use the specified entity resolver.
-    pub fn from_str_with_resolver(source: &'de str, entity_resolver_factory: EF) -> Self {
-        Self::borrowing_with_resolver(NsReader::from_str(source), entity_resolver_factory)
-    }
-
-    /// Create a new deserializer that will borrow data from the specified preconfigured
-    /// reader and use the specified entity resolver.
-    ///
-    /// Note, that config option [`Config::expand_empty_elements`] will be set to `true`.
-    ///
-    /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
-    pub fn borrowing_with_resolver(
-        mut reader: NsReader<&'de [u8]>,
-        entity_resolver_factory: EF,
-    ) -> Self {
-        let config = reader.config_mut();
-        config.expand_empty_elements = true;
-
-        Self::new(XmlReader::borrowed_ns(reader, entity_resolver_factory))
-    }
-}
-
-impl<'de, 'e> Deserializer<'de, 'e> {
     /// Create a new deserializer that will copy data from the specified reader
     /// into internal buffer.
     ///
@@ -3073,41 +3096,6 @@ impl<'de, 'e> Deserializer<'de, 'e> {
     #[inline]
     pub fn buffering(reader: NsReader<Box<dyn BufRead + 'de>>) -> Self {
         Self::buffering_with_resolver(reader, PredefinedEntityResolver)
-    }
-}
-
-impl<'de, 'e, EF> Deserializer<'de, 'e, EF>
-where
-    EF: EntityResolverFactory<'de>,
-{
-    /// Create a new deserializer that will copy data from the specified reader
-    /// into internal buffer and use the specified entity resolver.
-    ///
-    /// If you already have a string use [`Self::from_str`] instead, because it
-    /// will borrow instead of copy. If you have `&[u8]` which is known to represent
-    /// UTF-8, you can decode it first before using [`from_str`].
-    pub fn with_resolver<R>(reader: R, entity_resolver_factory: EF) -> Self
-    where
-        R: BufRead + 'de,
-    {
-        let boxed: Box<dyn BufRead + 'de> = Box::new(reader);
-        Self::buffering_with_resolver(NsReader::from_reader(boxed), entity_resolver_factory)
-    }
-
-    /// Create new deserializer that will copy data from the specified preconfigured reader
-    /// into internal buffer and use the specified entity resolver.
-    ///
-    /// Note, that config option [`Config::expand_empty_elements`] will be set to `true`.
-    ///
-    /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
-    pub fn buffering_with_resolver(
-        mut reader: NsReader<Box<dyn BufRead + 'de>>,
-        entity_resolver_factory: EF,
-    ) -> Self {
-        let config = reader.config_mut();
-        config.expand_empty_elements = true;
-
-        Self::new(XmlReader::buffered_ns(reader, entity_resolver_factory))
     }
 }
 
