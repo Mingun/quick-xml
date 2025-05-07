@@ -11,7 +11,7 @@ use std::{
 };
 
 #[cfg(feature = "serialize")]
-use serde::de::{Deserialize, Deserializer, Error, Visitor};
+use serde::de::{Deserialize, DeserializeSeed, Deserializer, Error, Unexpected, Visitor};
 #[cfg(feature = "serialize")]
 use serde::ser::{Serialize, Serializer};
 
@@ -242,6 +242,94 @@ impl<'de> Serialize for Bytes<'de> {
         S: Serializer,
     {
         serializer.serialize_bytes(self.0)
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+
+/// A visitor which is able to return borrowed `Cow<str>`.
+///
+/// Serde implementation is generic for any `Cow<T>` and because visitor has no
+/// hint methods for arbitrary borrowing types, [`Cow`] is always deserialized as
+/// [`Cow::Owned`] variant. This visitor and seed allows to deserialize borrowed
+/// variant of a [`Cow`] for a string.
+#[cfg(feature = "serialize")]
+pub struct CowStrVisitor;
+
+#[cfg(feature = "serialize")]
+impl<'de> Visitor<'de> for CowStrVisitor {
+    type Value = Cow<'de, str>;
+
+    fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("a string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Cow::Owned(v.to_owned()))
+    }
+
+    #[inline]
+    fn visit_borrowed_str<E>(self, v: &'de str) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Cow::Borrowed(v))
+    }
+
+    #[inline]
+    fn visit_string<E>(self, v: String) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(Cow::Owned(v))
+    }
+
+    fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        match std::str::from_utf8(v) {
+            Ok(s) => Ok(Cow::Owned(s.to_owned())),
+            Err(_) => Err(Error::invalid_value(Unexpected::Bytes(v), &self)),
+        }
+    }
+
+    fn visit_borrowed_bytes<E>(self, v: &'de [u8]) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        match std::str::from_utf8(v) {
+            Ok(s) => Ok(Cow::Borrowed(s)),
+            Err(_) => Err(Error::invalid_value(Unexpected::Bytes(v), &self)),
+        }
+    }
+
+    fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        match String::from_utf8(v) {
+            Ok(s) => Ok(Cow::Owned(s)),
+            Err(e) => Err(Error::invalid_value(
+                Unexpected::Bytes(&e.into_bytes()),
+                &self,
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "serialize")]
+impl<'de> DeserializeSeed<'de> for CowStrVisitor {
+    type Value = Cow<'de, str>;
+
+    fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_string(self)
     }
 }
 
