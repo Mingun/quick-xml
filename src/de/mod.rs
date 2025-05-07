@@ -2096,6 +2096,7 @@ macro_rules! deserialize_primitives {
 }
 
 mod attributes;
+mod dom;
 mod key;
 mod map;
 mod resolver;
