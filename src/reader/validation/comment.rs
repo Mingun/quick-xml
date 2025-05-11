@@ -3,8 +3,8 @@ use std::slice::Iter;
 
 use crate::events::BytesComment;
 
-use super::ValidationError;
 use super::ValidationError::*;
+use super::{is_xml11_char, ValidationError};
 
 /// An iterator that search validation errors in comments. It is created by
 /// [`BytesComment::validate()`] method.
@@ -22,6 +22,7 @@ impl<'i> CommentValidationIter<'i> {
     fn wrap(content: &'i str) -> Self {
         let mut iter = content.as_bytes().iter();
         Self {
+            // FIXME: check the first character
             dash: matches!(iter.next(), Some(b'-')),
             iter,
         }
@@ -43,6 +44,9 @@ impl<'i> Iterator for CommentValidationIter<'i> {
                 return Some(DoubleHyphenInComment);
             }
             self.dash = dash;
+            if !is_xml11_char(*ch as char) {
+                return Some(RestrictedChar(*ch as char));
+            }
         }
         // If comment ends with a dash, we should report error
         if self.dash {
@@ -75,6 +79,35 @@ mod tests {
 
         assert_eq!(it.next(), None);
         assert_eq!(it.next(), None);
+    }
+
+    #[test]
+    fn restricted_chars() {
+        for i in 0..=0x10FFFF {
+            match char::from_u32(i) {
+                Some(ch) if !is_xml11_char(ch) => {
+                    let text = format!("{ch} - not an XML {ch} character");
+                    let mut it = CommentValidationIter::from(text.as_ref());
+
+                    assert_eq!(
+                        it.next(),
+                        Some(RestrictedChar(ch)),
+                        "character 0x{:x} (`{ch}`)",
+                        ch as u32,
+                    );
+                    assert_eq!(
+                        it.next(),
+                        Some(RestrictedChar(ch)),
+                        "character 0x{:x} (`{ch}`)",
+                        ch as u32,
+                    );
+                    assert_eq!(it.next(), None, "character 0x{:x} (`{ch}`)", ch as u32);
+                    assert_eq!(it.next(), None, "character 0x{:x} (`{ch}`)", ch as u32);
+                }
+                // Do not check non-discouraged characters and codepoints thats are not characters
+                _ => {}
+            }
+        }
     }
 
     mod dash {
