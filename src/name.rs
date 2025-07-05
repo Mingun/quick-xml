@@ -924,7 +924,6 @@ impl NamespaceResolver {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#);
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut txt = Vec::new();
@@ -949,7 +948,15 @@ impl NamespaceResolver {
     ///     }
     /// }
     /// assert_eq!(count, 3);
-    /// assert_eq!(txt, vec!["Test".to_string(), "Test 2".to_string()]);
+    /// assert_eq!(txt, vec![
+    ///     "\n    ",
+    ///     "\n       ",
+    ///     "Test",
+    ///     "\n       ",
+    ///     "Test 2",
+    ///     "\n    ",
+    ///     "\n",
+    /// ]);
     /// ```
     ///
     /// [namespace name]: https://www.w3.org/TR/xml-names11/#dt-NSName
@@ -1006,16 +1013,15 @@ impl NamespaceResolver {
     /// use quick_xml::name::{Namespace, PrefixDeclaration};
     /// use quick_xml::NsReader;
     ///
-    /// let src = "<root>
-    ///   <a xmlns=\"a1\" xmlns:a=\"a2\">
-    ///     <b xmlns=\"b1\" xmlns:b=\"b2\">
-    ///       <c/>
-    ///     </b>
-    ///     <d/>
-    ///   </a>
+    /// let src = "<root>\
+    ///   <a xmlns=\"a1\" xmlns:a=\"a2\">\
+    ///     <b xmlns=\"b1\" xmlns:b=\"b2\">\
+    ///       <c/>\
+    ///     </b>\
+    ///     <d/>\
+    ///   </a>\
     /// </root>";
     /// let mut reader = NsReader::from_str(src);
-    /// reader.config_mut().trim_text_start = true;
     /// // No bindings at the beginning
     /// assert_eq!(reader.resolver().bindings().collect::<Vec<_>>(), vec![]);
     ///
@@ -1101,16 +1107,15 @@ impl NamespaceResolver {
     /// use quick_xml::name::{Namespace, PrefixDeclaration};
     /// use quick_xml::NsReader;
     ///
-    /// let src = "<root>
-    ///   <a xmlns=\"a1\" xmlns:a=\"a2\">
-    ///     <b xmlns=\"b1\" xmlns:b=\"b2\">
-    ///       <c/>
-    ///     </b>
-    ///     <d/>
-    ///   </a>
+    /// let src = "<root>\
+    ///   <a xmlns=\"a1\" xmlns:a=\"a2\">\
+    ///     <b xmlns=\"b1\" xmlns:b=\"b2\">\
+    ///       <c/>\
+    ///     </b>\
+    ///     <d/>\
+    ///   </a>\
     /// </root>";
     /// let mut reader = NsReader::from_str(src);
-    /// reader.config_mut().trim_text_start = true;
     /// reader.read_resolved_event()?; // <root>
     /// reader.read_resolved_event()?; // <a>
     /// reader.read_resolved_event()?; // <b>

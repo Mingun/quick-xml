@@ -158,27 +158,6 @@ pub struct Config {
     /// [`End`]: crate::events::Event::End
     /// [`check_end_names`]: Self::check_end_names
     pub trim_markup_names_in_closing_tags: bool,
-
-    /// Whether whitespace before character data should be removed.
-    ///
-    /// When set to `true`, leading whitespace is trimmed in [`Text`] events.
-    /// If after that the event is empty it will not be pushed.
-    ///
-    /// Default: `false`
-    ///
-    /// <div style="background:rgba(80, 240, 100, 0.20);padding:0.75em;">
-    ///
-    /// WARNING: With this option every text events will be trimmed which is
-    /// incorrect behavior when text events delimited by comments, processing
-    /// instructions or CDATA sections. To correctly trim data manually apply
-    /// [`BytesText::inplace_trim_start`] and [`BytesText::inplace_trim_end`]
-    /// only to necessary events.
-    /// </div>
-    ///
-    /// [`Text`]: crate::events::Event::Text
-    /// [`BytesText::inplace_trim_start`]: crate::events::BytesText::inplace_trim_start
-    /// [`BytesText::inplace_trim_end`]: crate::events::BytesText::inplace_trim_end
-    pub trim_text_start: bool,
 }
 
 impl Config {
@@ -201,7 +180,6 @@ impl Default for Config {
             check_end_names: true,
             expand_empty_elements: false,
             trim_markup_names_in_closing_tags: true,
-            trim_text_start: false,
         }
     }
 }
@@ -278,10 +256,6 @@ macro_rules! read_event_impl {
                     }
                 }
                 ParseState::InsideText => { // Go to InsideMarkup or Done state
-                    if $self.state.config.trim_text_start {
-                        $reader.skip_whitespace(&mut $self.state.offset) $(.$await)? ?;
-                    }
-
                     match $reader.read_text($buf, &mut $self.state.offset) $(.$await)? {
                         ReadTextResult::Markup(buf) => {
                             $self.state.state = ParseState::InsideMarkup;
@@ -439,45 +413,22 @@ macro_rules! read_to_end {
         $clear:block
         $(, $await:ident)?
     ) => {{
-        // Because we take position after the event before the End event,
-        // it is important that this position indicates beginning of the End event.
-        // If between last event and the End event would be only spaces, then we
-        // take position before the spaces, but spaces would be skipped without
-        // generating event if `trim_text_start` is set to `true`. To prevent that
-        // we temporary disable start text trimming.
-        //
-        // We also cannot take position after getting End event, because if
-        // `trim_markup_names_in_closing_tags` is set to `true` (which is the default),
-        // we do not known the real size of the End event that it is occupies in
-        // the source and cannot correct the position after the End event.
-        // So, we in any case should tweak parser configuration.
-        let config = $self.config_mut();
-        let trim = config.trim_text_start;
-        config.trim_text_start = false;
-
         let start = $self.buffer_position();
         let mut depth = 0;
         loop {
             $clear
             let end = $self.buffer_position();
             match $self.$read_event($buf) $(.$await)? {
-                Err(e) => {
-                    $self.config_mut().trim_text_start = trim;
-                    return Err(e);
-                }
+                Err(e) => return Err(e),
 
                 Ok(Event::Start(e)) if e.name() == $end => depth += 1,
                 Ok(Event::End(e)) if e.name() == $end => {
                     if depth == 0 {
-                        $self.config_mut().trim_text_start = trim;
                         break start..end;
                     }
                     depth -= 1;
                 }
-                Ok(Event::Eof) => {
-                    $self.config_mut().trim_text_start = trim;
-                    return Err(Error::missed_end($end));
-                }
+                Ok(Event::Eof) => return Err(Error::missed_end($end)),
                 _ => (),
             }
         }
@@ -1074,13 +1025,6 @@ trait XmlSource<'r, B> {
         buf: B,
         position: &mut u64,
     ) -> Result<(BangType, &'r str), Error>;
-
-    /// Consume and discard all the whitespace until the next non-whitespace
-    /// character or EOF.
-    ///
-    /// # Parameters
-    /// - `position`: Will be increased by amount of bytes consumed
-    fn skip_whitespace(&mut self, position: &mut u64) -> io::Result<()>;
 
     /// Return one character without consuming it, so that future `read_*` calls
     /// will still include it. On EOF, return `None`.

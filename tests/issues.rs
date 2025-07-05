@@ -21,7 +21,6 @@ fn issue94() {
 <!B>
 </Run>"#;
     let mut reader = Reader::from_reader(&data[..]);
-    reader.config_mut().trim_text_start = true;
     loop {
         match reader.read_event() {
             Ok(Event::Eof) | Err(..) => break,
@@ -326,17 +325,15 @@ mod issue623 {
     #[test]
     fn borrowed() {
         let mut reader = Reader::from_str(
-            "
+            "\
             <AppendedData>
                 _binary << data&>
-            </AppendedData>
-        ",
+            </AppendedData>",
         );
-        reader.config_mut().trim_text_start = true;
 
         assert_eq!(
             (reader.read_event().unwrap(), reader.buffer_position()),
-            (Event::Start(BytesStart::new("AppendedData")), 27)
+            (Event::Start(BytesStart::new("AppendedData")), 14)
         );
 
         let mut inner = reader.stream();
@@ -347,12 +344,17 @@ mod issue623 {
         let mut binary = [0u8; 16];
         inner.read_exact(&mut binary).unwrap();
         assert_eq!(Bytes(&binary), Bytes(b"binary << data&>"));
-        assert_eq!(inner.offset(), 61);
-        assert_eq!(reader.buffer_position(), 61);
+        assert_eq!(inner.offset(), 48);
+        assert_eq!(reader.buffer_position(), 48);
 
         assert_eq!(
             (reader.read_event().unwrap(), reader.buffer_position()),
-            (Event::End(BytesEnd::new("AppendedData")), 89)
+            (Event::Text(BytesText::new("\n            ")), 61)
+        );
+
+        assert_eq!(
+            (reader.read_event().unwrap(), reader.buffer_position()),
+            (Event::End(BytesEnd::new("AppendedData")), 76)
         );
 
         assert_eq!(reader.read_event().unwrap(), Event::Eof);
@@ -362,20 +364,18 @@ mod issue623 {
     fn buffered() {
         let mut buf = Vec::new();
         let mut reader = Reader::from_reader(Cursor::new(
-            b"
+            b"\
             <AppendedData>
                 _binary << data&>
-            </AppendedData>
-        ",
+            </AppendedData>",
         ));
-        reader.config_mut().trim_text_start = true;
 
         assert_eq!(
             (
                 reader.read_event_into(&mut buf).unwrap(),
                 reader.buffer_position()
             ),
-            (Event::Start(BytesStart::new("AppendedData")), 27)
+            (Event::Start(BytesStart::new("AppendedData")), 14)
         );
 
         let mut inner = reader.stream();
@@ -386,15 +386,23 @@ mod issue623 {
         let mut binary = [0u8; 16];
         inner.read_exact(&mut binary).unwrap();
         assert_eq!(Bytes(&binary), Bytes(b"binary << data&>"));
-        assert_eq!(inner.offset(), 61);
-        assert_eq!(reader.buffer_position(), 61);
+        assert_eq!(inner.offset(), 48);
+        assert_eq!(reader.buffer_position(), 48);
 
         assert_eq!(
             (
                 reader.read_event_into(&mut buf).unwrap(),
                 reader.buffer_position()
             ),
-            (Event::End(BytesEnd::new("AppendedData")), 89)
+            (Event::Text(BytesText::new("\n            ")), 61)
+        );
+
+        assert_eq!(
+            (
+                reader.read_event_into(&mut buf).unwrap(),
+                reader.buffer_position()
+            ),
+            (Event::End(BytesEnd::new("AppendedData")), 76)
         );
 
         assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);

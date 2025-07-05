@@ -93,20 +93,18 @@ mod read_to_end {
 async fn issue623() {
     let mut buf = Vec::new();
     let mut reader = Reader::from_reader(Cursor::new(
-        b"
+        b"\
         <AppendedData>
             _binary << data&>
-        </AppendedData>
-    ",
+        </AppendedData>",
     ));
-    reader.config_mut().trim_text_start = true;
 
     assert_eq!(
         (
             reader.read_event_into_async(&mut buf).await.unwrap(),
             reader.buffer_position()
         ),
-        (Start(BytesStart::new("AppendedData")), 23)
+        (Start(BytesStart::new("AppendedData")), 14)
     );
 
     let mut inner = reader.stream();
@@ -117,15 +115,23 @@ async fn issue623() {
     let mut binary = [0u8; 16];
     inner.read_exact(&mut binary).await.unwrap();
     assert_eq!(Bytes(&binary), Bytes(b"binary << data&>"));
-    assert_eq!(inner.offset(), 53);
-    assert_eq!(reader.buffer_position(), 53);
+    assert_eq!(inner.offset(), 44);
+    assert_eq!(reader.buffer_position(), 44);
 
     assert_eq!(
         (
             reader.read_event_into_async(&mut buf).await.unwrap(),
             reader.buffer_position()
         ),
-        (End(BytesEnd::new("AppendedData")), 77)
+        (Text(BytesText::new("\n        ")), 53)
+    );
+
+    assert_eq!(
+        (
+            reader.read_event_into_async(&mut buf).await.unwrap(),
+            reader.buffer_position()
+        ),
+        (End(BytesEnd::new("AppendedData")), 68)
     );
 
     assert_eq!(reader.read_event_into_async(&mut buf).await.unwrap(), Eof);

@@ -3195,15 +3195,9 @@ impl<'de> Deserializer<'de, SliceReader<'de>> {
     ///
     /// let mut reader = NsReader::from_str("<xml><tag>    test    </tag></xml>");
     ///
-    /// let mut de = Deserializer::borrowing(reader.clone());
-    /// let obj = Object::deserialize(&mut de).unwrap();
-    /// assert_eq!(obj, Object { tag: "    test    " });
-    ///
-    /// reader.config_mut().trim_text_start = true;
-    ///
     /// let mut de = Deserializer::borrowing(reader);
     /// let obj = Object::deserialize(&mut de).unwrap();
-    /// assert_eq!(obj, Object { tag: "test    " });
+    /// assert_eq!(obj, Object { tag: "    test    " });
     /// ```
     ///
     /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements
@@ -3291,15 +3285,9 @@ where
     ///
     /// let mut reader = NsReader::from_str("<xml><tag>    test    </tag></xml>");
     ///
-    /// let mut de = Deserializer::buffering(reader.clone());
-    /// let obj = Object::deserialize(&mut de).unwrap();
-    /// assert_eq!(obj, Object { tag: "    test    ".to_string() });
-    ///
-    /// reader.config_mut().trim_text_start = true;
-    ///
     /// let mut de = Deserializer::buffering(reader);
     /// let obj = Object::deserialize(&mut de).unwrap();
-    /// assert_eq!(obj, Object { tag: "test    ".to_string() });
+    /// assert_eq!(obj, Object { tag: "    test    ".to_string() });
     /// ```
     ///
     /// [`Config::expand_empty_elements`]: crate::reader::Config::expand_empty_elements

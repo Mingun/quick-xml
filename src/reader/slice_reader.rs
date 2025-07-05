@@ -16,7 +16,6 @@ use crate::events::{BytesText, Event};
 use crate::name::QName;
 use crate::parser::Parser;
 use crate::reader::{BangType, ReadRefResult, ReadTextResult, Reader, Span, XmlSource};
-use crate::utils::is_whitespace;
 
 /// This is an implementation for reading from a `&[u8]` as underlying byte stream.
 /// This implementation supports not using an intermediate buffer as the byte slice
@@ -56,7 +55,6 @@ impl<'a> Reader<&'a [u8]> {
     ///        <tag2>Test 2</tag2>
     ///     </tag1>
     /// "#);
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut txt = Vec::new();
@@ -69,7 +67,15 @@ impl<'a> Reader<&'a [u8]> {
     ///     }
     /// }
     /// assert_eq!(count, 3);
-    /// assert_eq!(txt, vec!["Test".to_string(), "Test 2".to_string()]);
+    /// assert_eq!(txt, vec![
+    ///     "\n    ",
+    ///     "\n       ",
+    ///     "Test",
+    ///     "\n       ",
+    ///     "Test 2",
+    ///     "\n    ",
+    ///     "\n",
+    /// ]);
     /// ```
     #[inline]
     pub fn read_event(&mut self) -> Result<Event<'a>> {
@@ -123,7 +129,7 @@ impl<'a> Reader<&'a [u8]> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::Reader;
     ///
-    /// let mut reader = Reader::from_str(r#"
+    /// let mut reader = Reader::from_str("\
     ///     <outer>
     ///         <inner>
     ///             <inner></inner>
@@ -131,9 +137,8 @@ impl<'a> Reader<&'a [u8]> {
     ///             <outer></outer>
     ///             <outer/>
     ///         </inner>
-    ///     </outer>
-    /// "#);
-    /// reader.config_mut().trim_text_start = true;
+    ///     </outer>\
+    /// ");
     ///
     /// let start = BytesStart::new("outer");
     /// let end   = start.to_end().into_owned();
@@ -188,14 +193,13 @@ impl<'a> Reader<&'a [u8]> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::Reader;
     ///
-    /// let mut reader = Reader::from_str("
+    /// let mut reader = Reader::from_str("\
     ///     <html>
     ///         <title>This is a HTML text</title>
     ///         <p>Usual XML rules does not apply inside it
     ///         <p>For example, elements not needed to be &quot;closed&quot;
-    ///     </html>
+    ///     </html>\
     /// ");
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
@@ -399,17 +403,6 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
 
         *position += self.len() as u64;
         Err(Error::Syntax(bang_type.to_err()))
-    }
-
-    #[inline]
-    fn skip_whitespace(&mut self, position: &mut u64) -> io::Result<()> {
-        let whitespaces = self
-            .iter()
-            .position(|b| !is_whitespace(*b))
-            .unwrap_or(self.len());
-        *position += whitespaces as u64;
-        *self = &self[whitespaces..];
-        Ok(())
     }
 
     #[inline]

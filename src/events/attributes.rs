@@ -512,17 +512,16 @@ impl<'a> Attributes<'a> {
     /// use quick_xml::name::QName;
     /// use quick_xml::reader::NsReader;
     ///
-    /// let mut reader = NsReader::from_str("
-    ///     <root xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>
-    ///         <true xsi:nil='true'/>
-    ///         <false xsi:nil='false'/>
-    ///         <none/>
-    ///         <non-xsi xsi:nil='true' xmlns:xsi='namespace'/>
-    ///         <unbound-nil nil='true' xmlns='http://www.w3.org/2001/XMLSchema-instance'/>
-    ///         <another-xmlns f:nil='true' xmlns:f='http://www.w3.org/2001/XMLSchema-instance'/>
+    /// let mut reader = NsReader::from_str("\
+    ///     <root xmlns:xsi='http://www.w3.org/2001/XMLSchema-instance'>\
+    ///         <true xsi:nil='true'/>\
+    ///         <false xsi:nil='false'/>\
+    ///         <none/>\
+    ///         <non-xsi xsi:nil='true' xmlns:xsi='namespace'/>\
+    ///         <unbound-nil nil='true' xmlns='http://www.w3.org/2001/XMLSchema-instance'/>\
+    ///         <another-xmlns f:nil='true' xmlns:f='http://www.w3.org/2001/XMLSchema-instance'/>\
     ///     </root>
     /// ");
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// macro_rules! check {
     ///     ($reader:expr, $name:literal, $value:literal) => {

@@ -16,7 +16,6 @@ use crate::reader::buffered_reader::impl_buffered_source;
 use crate::reader::{
     BangType, BinaryStream, NsReader, ParseState, ReadRefResult, ReadTextResult, Reader, Span,
 };
-use crate::utils::is_whitespace;
 
 /// A struct for read XML asynchronously from an [`AsyncBufRead`].
 ///
@@ -96,7 +95,6 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     ///        <tag2>Test 2</tag2>
     ///     </tag1>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();
@@ -112,7 +110,15 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     ///     buf.clear();
     /// }
     /// assert_eq!(count, 3);
-    /// assert_eq!(txt, vec!["Test".to_string(), "Test 2".to_string()]);
+    /// assert_eq!(txt, vec![
+    ///     "\n    ",
+    ///     "\n       ",
+    ///     "Test",
+    ///     "\n       ",
+    ///     "Test 2",
+    ///     "\n    ",
+    ///     "\n",
+    /// ]);
     /// # }) // tokio_test::block_on
     /// ```
     ///
@@ -148,7 +154,7 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::Reader;
     ///
-    /// let mut reader = Reader::from_reader(r#"
+    /// let mut reader = Reader::from_reader("\
     ///     <outer>
     ///         <inner>
     ///             <inner></inner>
@@ -156,9 +162,8 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     ///             <outer></outer>
     ///             <outer/>
     ///         </inner>
-    ///     </outer>
-    /// "#.as_bytes());
-    /// reader.config_mut().trim_text_start = true;
+    ///     </outer>\
+    /// ".as_bytes());
     /// let mut buf = Vec::new();
     ///
     /// let start = BytesStart::new("outer");
@@ -215,14 +220,13 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::Reader;
     ///
-    /// let mut reader = Reader::from_reader("
+    /// let mut reader = Reader::from_reader("\
     ///     <html>
     ///         <title>This is a HTML text</title>
     ///         <p>Usual XML rules does not apply inside it
     ///         <p>For example, elements not needed to be &quot;closed&quot;
-    ///     </html>
+    ///     </html>\
     /// ".as_bytes());
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
@@ -308,7 +312,6 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();
@@ -333,7 +336,15 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///     buf.clear();
     /// }
     /// assert_eq!(count, 3);
-    /// assert_eq!(txt, vec!["Test".to_string(), "Test 2".to_string()]);
+    /// assert_eq!(txt, vec![
+    ///     "\n    ",
+    ///     "\n       ",
+    ///     "Test",
+    ///     "\n       ",
+    ///     "Test 2",
+    ///     "\n    ",
+    ///     "\n",
+    /// ]);
     /// # }) // tokio_test::block_on
     /// ```
     ///
@@ -365,25 +376,24 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::NsReader;
     ///
-    /// let mut reader = NsReader::from_reader(r#"
-    ///     <outer xmlns="namespace 1">
-    ///         <inner xmlns="namespace 2">
+    /// let mut reader = NsReader::from_reader("\
+    ///     <outer xmlns='namespace 1'>
+    ///         <inner xmlns='namespace 2'>
     ///             <outer></outer>
     ///         </inner>
     ///         <inner>
     ///             <inner></inner>
     ///             <inner/>
     ///             <outer></outer>
-    ///             <p:outer xmlns:p="ns"></p:outer>
+    ///             <p:outer xmlns:p='ns'></p:outer>
     ///             <outer/>
     ///         </inner>
-    ///     </outer>
-    /// "#.as_bytes());
-    /// reader.config_mut().trim_text_start = true;
+    ///     </outer>\
+    /// ".as_bytes());
     /// let mut buf = Vec::new();
     ///
     /// let ns = Namespace("namespace 1");
-    /// let start = BytesStart::from_content(r#"outer xmlns="namespace 1""#, 5);
+    /// let start = BytesStart::from_content("outer xmlns='namespace 1'", 5);
     /// let end   = start.to_end().into_owned();
     ///
     /// // First, we read a start event...
@@ -440,14 +450,13 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::NsReader;
     ///
-    /// let mut reader = NsReader::from_reader("
+    /// let mut reader = NsReader::from_reader("\
     ///     <html>
     ///         <title>This is a HTML text</title>
     ///         <p>Usual XML rules does not apply inside it
     ///         <p>For example, elements not needed to be &quot;closed&quot;
-    ///     </html>
+    ///     </html>\
     /// ".as_bytes());
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
@@ -520,7 +529,6 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();
@@ -546,7 +554,15 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///     buf.clear();
     /// }
     /// assert_eq!(count, 3);
-    /// assert_eq!(txt, vec!["Test".to_string(), "Test 2".to_string()]);
+    /// assert_eq!(txt, vec![
+    ///     "\n    ",
+    ///     "\n       ",
+    ///     "Test",
+    ///     "\n       ",
+    ///     "Test 2",
+    ///     "\n    ",
+    ///     "\n",
+    /// ]);
     /// # }) // tokio_test::block_on
     /// ```
     ///

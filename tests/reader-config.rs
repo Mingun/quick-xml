@@ -6,7 +6,7 @@
 //! Please keep tests sorted (exceptions are allowed if options are tightly related).
 
 use quick_xml::errors::{Error, IllFormedError};
-use quick_xml::events::{BytesCData, BytesEnd, BytesPI, BytesRef, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesEnd, BytesRef, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 
 mod allow_dangling_amp {
@@ -554,137 +554,6 @@ mod trim_markup_names_in_closing_tags {
         assert_eq!(
             reader.read_event().unwrap(),
             Event::Start(BytesStart::new("root"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::End(BytesEnd::new("root"))
-        );
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
-    }
-}
-
-const XML: &str = " \t\r\n\
-<!DOCTYPE root \t\r\n> \t\r\n\
-<root \t\r\n> \t\r\n\
-    <empty \t\r\n/> \t\r\n\
-    text \t\r\n\
-    <!-- comment \t\r\n--> \t\r\n\
-    <![CDATA[ \t\r\ncdata \t\r\n]]> \t\r\n\
-    <?pi \t\r\n?> \t\r\n\
-</root> \t\r\n";
-
-mod trim_text_start {
-    use super::*;
-    use pretty_assertions::assert_eq;
-
-    #[test]
-    fn false_() {
-        let mut reader = Reader::from_str(XML);
-        reader.config_mut().trim_text_start = false;
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\n"))
-        );
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::DocType(BytesText::from_escaped("root \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\n"))
-        );
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Start(BytesStart::from_content("root \t\r\n", 4))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\n"))
-        );
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Empty(BytesStart::from_content("empty \t\r\n", 5))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\ntext \t\r\n"))
-        );
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Comment(BytesText::from_escaped(" comment \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\n"))
-        );
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::CData(BytesCData::new(" \t\r\ncdata \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\n"))
-        );
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::PI(BytesPI::new("pi \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\n"))
-        );
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::End(BytesEnd::new("root"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped(" \t\r\n"))
-        );
-
-        assert_eq!(reader.read_event().unwrap(), Event::Eof);
-    }
-
-    #[test]
-    fn true_() {
-        let mut reader = Reader::from_str(XML);
-        reader.config_mut().trim_text_start = true;
-
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::DocType(BytesText::from_escaped("root \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Start(BytesStart::from_content("root \t\r\n", 4))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Empty(BytesStart::from_content("empty \t\r\n", 5))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Text(BytesText::from_escaped("text \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::Comment(BytesText::from_escaped(" comment \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::CData(BytesCData::new(" \t\r\ncdata \t\r\n"))
-        );
-        assert_eq!(
-            reader.read_event().unwrap(),
-            Event::PI(BytesPI::new("pi \t\r\n"))
         );
         assert_eq!(
             reader.read_event().unwrap(),

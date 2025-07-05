@@ -11,7 +11,6 @@ use crate::events::{BytesText, Event};
 use crate::name::QName;
 use crate::parser::Parser;
 use crate::reader::{BangType, ReadRefResult, ReadTextResult, Reader, Span, XmlSource};
-use crate::utils::is_whitespace;
 
 macro_rules! impl_buffered_source {
     ($($lf:lifetime, $reader:tt, $async:ident, $await:ident)?) => {
@@ -310,26 +309,6 @@ macro_rules! impl_buffered_source {
         }
 
         #[inline]
-        $($async)? fn skip_whitespace(&mut self, position: &mut u64) -> io::Result<()> {
-            loop {
-                break match self $(.$reader)? .fill_buf() $(.$await)? {
-                    Ok(n) => {
-                        let count = n.iter().position(|b| !is_whitespace(*b)).unwrap_or(n.len());
-                        if count > 0 {
-                            self $(.$reader)? .consume(count);
-                            *position += count as u64;
-                            continue;
-                        } else {
-                            Ok(())
-                        }
-                    }
-                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                    Err(e) => Err(e),
-                };
-            }
-        }
-
-        #[inline]
         $($async)? fn peek_one(&mut self) -> io::Result<Option<u8>> {
             // That method is called only when available buffer starts from '<'
             // We need to consume it
@@ -390,7 +369,6 @@ impl<R: BufRead> Reader<R> {
     ///                 <tag2>Test 2</tag2>
     ///              </tag1>"#;
     /// let mut reader = Reader::from_str(xml);
-    /// reader.config_mut().trim_text_start = true;
     /// let mut count = 0;
     /// let mut buf = Vec::new();
     /// let mut txt = Vec::new();
@@ -405,7 +383,13 @@ impl<R: BufRead> Reader<R> {
     ///     buf.clear();
     /// }
     /// assert_eq!(count, 3);
-    /// assert_eq!(txt, vec!["Test".to_string(), "Test 2".to_string()]);
+    /// assert_eq!(txt, vec![
+    ///     "\n                ",
+    ///     "Test",
+    ///     "\n                ",
+    ///     "Test 2",
+    ///     "\n             ",
+    /// ]);
     /// ```
     #[inline]
     pub fn read_event_into<'b>(&mut self, buf: &'b mut Vec<u8>) -> Result<Event<'b>> {
@@ -465,7 +449,7 @@ impl<R: BufRead> Reader<R> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::Reader;
     ///
-    /// let mut reader = Reader::from_str(r#"
+    /// let mut reader = Reader::from_str("\
     ///     <outer>
     ///         <inner>
     ///             <inner></inner>
@@ -473,9 +457,8 @@ impl<R: BufRead> Reader<R> {
     ///             <outer></outer>
     ///             <outer/>
     ///         </inner>
-    ///     </outer>
-    /// "#);
-    /// reader.config_mut().trim_text_start = true;
+    ///     </outer>\
+    /// ");
     /// let mut buf = Vec::new();
     ///
     /// let start = BytesStart::new("outer");
@@ -532,14 +515,13 @@ impl<R: BufRead> Reader<R> {
     /// use quick_xml::events::{BytesStart, Event};
     /// use quick_xml::reader::Reader;
     ///
-    /// let mut reader = Reader::from_reader("
+    /// let mut reader = Reader::from_reader("\
     ///     <html>
     ///         <title>This is a HTML text</title>
     ///         <p>Usual XML rules does not apply inside it
     ///         <p>For example, elements not needed to be &quot;closed&quot;
-    ///     </html>
+    ///     </html>\
     /// ".as_bytes());
-    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
