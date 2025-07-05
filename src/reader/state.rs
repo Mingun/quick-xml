@@ -56,25 +56,6 @@ pub(super) struct ReaderState {
 }
 
 impl ReaderState {
-    /// Trims end whitespaces from `buf`, if required, and returns a text event.
-    ///
-    /// # Parameters
-    /// - `buf`: data from the start of stream to the first `<` or from `>` to `<`
-    pub fn emit_text<'b>(&mut self, buf: &'b str) -> Result<BytesText<'b>> {
-        let content = if self.config.trim_text_end {
-            // Skip the ending '<'
-            let len = buf
-                .as_bytes()
-                .iter()
-                .rposition(|&b| !is_whitespace(b))
-                .map_or(0, |p| p + 1);
-            &buf[..len]
-        } else {
-            buf
-        };
-        Ok(BytesText::wrap(content))
-    }
-
     /// Returns `Comment`, `CData` or `DocType` event.
     ///
     /// `buf` contains data between `<` and `>`:

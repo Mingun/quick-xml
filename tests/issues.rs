@@ -21,7 +21,7 @@ fn issue94() {
 <!B>
 </Run>"#;
     let mut reader = Reader::from_reader(&data[..]);
-    reader.config_mut().trim_text(true);
+    reader.config_mut().trim_text_start = true;
     loop {
         match reader.read_event() {
             Ok(Event::Eof) | Err(..) => break,
@@ -332,7 +332,7 @@ mod issue623 {
             </AppendedData>
         ",
         );
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text_start = true;
 
         assert_eq!(
             (reader.read_event().unwrap(), reader.buffer_position()),
@@ -368,7 +368,7 @@ mod issue623 {
             </AppendedData>
         ",
         ));
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text_start = true;
 
         assert_eq!(
             (

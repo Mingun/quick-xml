@@ -51,7 +51,7 @@ fn read_event(c: &mut Criterion) {
         b.iter(|| {
             let mut r = Reader::from_str(SAMPLE);
             let config = r.config_mut();
-            config.trim_text(true);
+            config.trim_text_start = true;
             config.check_end_names = false;
             let mut count = black_box(0);
             loop {
@@ -97,7 +97,7 @@ fn read_resolved_event_into(c: &mut Criterion) {
         b.iter(|| {
             let mut r = NsReader::from_str(SAMPLE);
             let config = r.config_mut();
-            config.trim_text(true);
+            config.trim_text_start = true;
             config.check_end_names = false;
             let mut count = black_box(0);
             loop {

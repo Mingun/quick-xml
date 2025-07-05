@@ -390,7 +390,7 @@ impl<R: BufRead> Reader<R> {
     ///                 <tag2>Test 2</tag2>
     ///              </tag1>"#;
     /// let mut reader = Reader::from_str(xml);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     /// let mut count = 0;
     /// let mut buf = Vec::new();
     /// let mut txt = Vec::new();
@@ -475,7 +475,7 @@ impl<R: BufRead> Reader<R> {
     ///         </inner>
     ///     </outer>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     /// let mut buf = Vec::new();
     ///
     /// let start = BytesStart::new("outer");
@@ -539,7 +539,7 @@ impl<R: BufRead> Reader<R> {
     ///         <p>For example, elements not needed to be &quot;closed&quot;
     ///     </html>
     /// ".as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();

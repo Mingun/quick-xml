@@ -8,7 +8,7 @@ use std::ops::Range;
 #[cfg(feature = "encoding")]
 use crate::encoding::DetectedEncoding;
 use crate::errors::{Error, IllFormedError, SyntaxError};
-use crate::events::{BytesRef, Event};
+use crate::events::{BytesRef, BytesText, Event};
 use crate::parser::{DtdParser, ElementParser, Parser, PiParser};
 use crate::reader::state::ReaderState;
 
@@ -179,51 +179,9 @@ pub struct Config {
     /// [`BytesText::inplace_trim_start`]: crate::events::BytesText::inplace_trim_start
     /// [`BytesText::inplace_trim_end`]: crate::events::BytesText::inplace_trim_end
     pub trim_text_start: bool,
-
-    /// Whether whitespace after character data should be removed.
-    ///
-    /// When set to `true`, trailing whitespace is trimmed in [`Text`] events.
-    /// If after that the event is empty it will not be pushed.
-    ///
-    /// Default: `false`
-    ///
-    /// <div style="background:rgba(80, 240, 100, 0.20);padding:0.75em;">
-    ///
-    /// WARNING: With this option every text events will be trimmed which is
-    /// incorrect behavior when text events delimited by comments, processing
-    /// instructions or CDATA sections. To correctly trim data manually apply
-    /// [`BytesText::inplace_trim_start`] and [`BytesText::inplace_trim_end`]
-    /// only to necessary events.
-    /// </div>
-    ///
-    /// [`Text`]: crate::events::Event::Text
-    /// [`BytesText::inplace_trim_start`]: crate::events::BytesText::inplace_trim_start
-    /// [`BytesText::inplace_trim_end`]: crate::events::BytesText::inplace_trim_end
-    pub trim_text_end: bool,
 }
 
 impl Config {
-    /// Set both [`trim_text_start`] and [`trim_text_end`] to the same value.
-    ///
-    /// <div style="background:rgba(80, 240, 100, 0.20);padding:0.75em;">
-    ///
-    /// WARNING: With this option every text events will be trimmed which is
-    /// incorrect behavior when text events delimited by comments, processing
-    /// instructions or CDATA sections. To correctly trim data manually apply
-    /// [`BytesText::inplace_trim_start`] and [`BytesText::inplace_trim_end`]
-    /// only to necessary events.
-    /// </div>
-    ///
-    /// [`trim_text_start`]: Self::trim_text_start
-    /// [`trim_text_end`]: Self::trim_text_end
-    /// [`BytesText::inplace_trim_start`]: crate::events::BytesText::inplace_trim_start
-    /// [`BytesText::inplace_trim_end`]: crate::events::BytesText::inplace_trim_end
-    #[inline]
-    pub fn trim_text(&mut self, trim: bool) {
-        self.trim_text_start = trim;
-        self.trim_text_end = trim;
-    }
-
     /// Turn on or off all checks for well-formedness. Currently it is that settings:
     /// - [`check_comments`](Self::check_comments)
     /// - [`check_end_names`](Self::check_end_names)
@@ -244,7 +202,6 @@ impl Default for Config {
             expand_empty_elements: false,
             trim_markup_names_in_closing_tags: true,
             trim_text_start: false,
-            trim_text_end: false,
         }
     }
 }
@@ -292,7 +249,7 @@ macro_rules! read_event_impl {
                         // Go to Done state
                         ReadRefResult::UpToEof(bytes) if $self.state.config.allow_dangling_amp => {
                             $self.state.state = ParseState::Done;
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text(BytesText::wrap(bytes)))
                         }
                         ReadRefResult::UpToEof(_) => {
                             $self.state.state = ParseState::Done;
@@ -301,7 +258,7 @@ macro_rules! read_event_impl {
                         }
                         // Do not change state, stay in InsideRef
                         ReadRefResult::UpToRef(bytes) if $self.state.config.allow_dangling_amp => {
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text(BytesText::wrap(bytes)))
                         }
                         ReadRefResult::UpToRef(_) => {
                             $self.state.last_error_offset = start;
@@ -310,7 +267,7 @@ macro_rules! read_event_impl {
                         // Go to InsideMarkup state
                         ReadRefResult::UpToMarkup(bytes) if $self.state.config.allow_dangling_amp => {
                             $self.state.state = ParseState::InsideMarkup;
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text(BytesText::wrap(bytes)))
                         }
                         ReadRefResult::UpToMarkup(_) => {
                             $self.state.state = ParseState::InsideMarkup;
@@ -340,25 +297,18 @@ macro_rules! read_event_impl {
                         }
                         ReadTextResult::UpToMarkup(bytes) => {
                             $self.state.state = ParseState::InsideMarkup;
-                            // FIXME: Can produce an empty event if:
-                            // - event contains only spaces
-                            // - trim_text_start = false
-                            // - trim_text_end = true
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text(BytesText::wrap(bytes)))
                         }
                         ReadTextResult::UpToRef(bytes) => {
                             $self.state.state = ParseState::InsideRef;
-                            // Return Text event with `bytes` content or Eof if bytes is empty
-                            Ok(Event::Text($self.state.emit_text(bytes)?))
+                            Ok(Event::Text(BytesText::wrap(bytes)))
                         }
                         ReadTextResult::UpToEof(bytes) => {
                             $self.state.state = ParseState::Done;
-                            // Trim bytes from end if required
-                            let event = $self.state.emit_text(bytes)?;
-                            if event.is_empty() {
+                            if bytes.is_empty() {
                                 Ok(Event::Eof)
                             } else {
-                                Ok(Event::Text(event))
+                                Ok(Event::Text(BytesText::wrap(bytes)))
                             }
                         }
                         ReadTextResult::Err(e) => Err(e),
@@ -874,10 +824,6 @@ impl<R> Reader<R> {
 
     /// Gets the byte position in the input data just after the last emitted event
     /// (i.e. this is position where data of last event ends).
-    ///
-    /// Note, that for text events which is originally ended with whitespace characters
-    /// (` `, `\t`, `\r`, and `\n`) if [`Config::trim_text_end`] is set this is position
-    /// before trim, not the position of the last byte of the [`Event::Text`] content.
     pub const fn buffer_position(&self) -> u64 {
         self.state.offset
     }

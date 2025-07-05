@@ -522,7 +522,7 @@ impl<'a> Attributes<'a> {
     ///         <another-xmlns f:nil='true' xmlns:f='http://www.w3.org/2001/XMLSchema-instance'/>
     ///     </root>
     /// ");
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// macro_rules! check {
     ///     ($reader:expr, $name:literal, $value:literal) => {

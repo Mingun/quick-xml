@@ -96,7 +96,7 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     ///        <tag2>Test 2</tag2>
     ///     </tag1>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();
@@ -158,7 +158,7 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     ///         </inner>
     ///     </outer>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     /// let mut buf = Vec::new();
     ///
     /// let start = BytesStart::new("outer");
@@ -222,7 +222,7 @@ impl<R: AsyncBufRead + Unpin> Reader<R> {
     ///         <p>For example, elements not needed to be &quot;closed&quot;
     ///     </html>
     /// ".as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
@@ -308,7 +308,7 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();
@@ -379,7 +379,7 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///         </inner>
     ///     </outer>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     /// let mut buf = Vec::new();
     ///
     /// let ns = Namespace("namespace 1");
@@ -447,7 +447,7 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///         <p>For example, elements not needed to be &quot;closed&quot;
     ///     </html>
     /// ".as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
@@ -520,7 +520,7 @@ impl<R: AsyncBufRead + Unpin> NsReader<R> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#.as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();

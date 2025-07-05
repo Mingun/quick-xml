@@ -156,7 +156,7 @@ impl<R: BufRead> NsReader<R> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();
@@ -214,7 +214,7 @@ impl<R: BufRead> NsReader<R> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut buf = Vec::new();
@@ -321,7 +321,7 @@ impl<R: BufRead> NsReader<R> {
     ///         </inner>
     ///     </outer>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     /// let mut buf = Vec::new();
     ///
     /// let ns = Namespace("namespace 1");
@@ -397,7 +397,7 @@ impl<R: BufRead> NsReader<R> {
     ///         <p>For example, elements not needed to be &quot;closed&quot;
     ///     </html>
     /// ".as_bytes());
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();
@@ -486,7 +486,7 @@ impl<'i> NsReader<&'i [u8]> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut txt = Vec::new();
@@ -547,7 +547,7 @@ impl<'i> NsReader<&'i [u8]> {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut txt = Vec::new();
@@ -643,7 +643,7 @@ impl<'i> NsReader<&'i [u8]> {
     ///         </inner>
     ///     </outer>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let ns = Namespace("namespace 1");
     /// let start = BytesStart::from_content(r#"outer xmlns="namespace 1""#, 5);
@@ -719,7 +719,7 @@ impl<'i> NsReader<&'i [u8]> {
     ///         <p>For example, elements not needed to be &quot;closed&quot;
     ///     </html>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();

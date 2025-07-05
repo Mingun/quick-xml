@@ -924,7 +924,7 @@ impl NamespaceResolver {
     ///        <y:tag2>Test 2</y:tag2>
     ///     </x:tag1>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut txt = Vec::new();
@@ -1015,7 +1015,7 @@ impl NamespaceResolver {
     ///   </a>
     /// </root>";
     /// let mut reader = NsReader::from_str(src);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     /// // No bindings at the beginning
     /// assert_eq!(reader.resolver().bindings().collect::<Vec<_>>(), vec![]);
     ///
@@ -1110,7 +1110,7 @@ impl NamespaceResolver {
     ///   </a>
     /// </root>";
     /// let mut reader = NsReader::from_str(src);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     /// reader.read_resolved_event()?; // <root>
     /// reader.read_resolved_event()?; // <a>
     /// reader.read_resolved_event()?; // <b>

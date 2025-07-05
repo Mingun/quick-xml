@@ -37,7 +37,7 @@ struct MyReader<'i> {
 impl<'i> MyReader<'i> {
     fn new(input: &'i str) -> Result<Self, regex::Error> {
         let mut reader = Reader::from_str(input);
-        reader.config_mut().trim_text(true);
+        reader.config_mut().trim_text_start = true;
 
         let mut readers = VecDeque::new();
         readers.push_back(reader);

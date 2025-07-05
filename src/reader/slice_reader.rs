@@ -56,7 +56,7 @@ impl<'a> Reader<&'a [u8]> {
     ///        <tag2>Test 2</tag2>
     ///     </tag1>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let mut count = 0;
     /// let mut txt = Vec::new();
@@ -133,7 +133,7 @@ impl<'a> Reader<&'a [u8]> {
     ///         </inner>
     ///     </outer>
     /// "#);
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("outer");
     /// let end   = start.to_end().into_owned();
@@ -195,7 +195,7 @@ impl<'a> Reader<&'a [u8]> {
     ///         <p>For example, elements not needed to be &quot;closed&quot;
     ///     </html>
     /// ");
-    /// reader.config_mut().trim_text(true);
+    /// reader.config_mut().trim_text_start = true;
     ///
     /// let start = BytesStart::new("html");
     /// let end   = start.to_end().into_owned();

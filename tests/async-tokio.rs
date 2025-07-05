@@ -99,7 +99,7 @@ async fn issue623() {
         </AppendedData>
     ",
     ));
-    reader.config_mut().trim_text(true);
+    reader.config_mut().trim_text_start = true;
 
     assert_eq!(
         (

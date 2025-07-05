@@ -53,7 +53,7 @@ fn test_empty_attr() {
 #[test]
 fn test_start_end_comment() {
     let mut r = Reader::from_str("<b><a b=\"test\" c=\"test\"/> <a  /><!--t--></b>");
-    r.config_mut().trim_text(true);
+    r.config_mut().trim_text_start = true;
 
     assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("b")));
     assert_eq!(
@@ -333,7 +333,7 @@ mod read_text {
     #[test]
     fn text() {
         let mut r = Reader::from_str("<tag> text </tag>");
-        r.config_mut().trim_text(true);
+        r.config_mut().trim_text_start = true;
 
         assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
         assert_eq!(
@@ -346,7 +346,7 @@ mod read_text {
     #[test]
     fn tag() {
         let mut r = Reader::from_str("<tag> <nested/> </tag>");
-        r.config_mut().trim_text(true);
+        r.config_mut().trim_text_start = true;
 
         assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
         assert_eq!(

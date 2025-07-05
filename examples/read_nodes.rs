@@ -117,7 +117,7 @@ fn main() -> Result<(), AppError> {
     let mut reader = Reader::from_str(XML);
     let config = reader.config_mut();
 
-    config.trim_text(true);
+    config.trim_text_start = true;
     // == Handling empty elements ==
     // To simply our processing code
     // we want the same events for empty elements, like:
