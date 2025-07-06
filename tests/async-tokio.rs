@@ -54,7 +54,6 @@ mod read_to_end {
     async fn text() {
         let mut r = Reader::from_str("<tag> text </tag>");
         //                            ^0   ^5    ^11
-        r.config_mut().trim_text(true);
 
         let mut buf = Vec::new();
         assert_eq!(
@@ -74,7 +73,6 @@ mod read_to_end {
     async fn tag() {
         let mut r = Reader::from_str("<tag> <nested/> </tag>");
         //                            ^0   ^5         ^16
-        r.config_mut().trim_text(true);
 
         let mut buf = Vec::new();
         assert_eq!(

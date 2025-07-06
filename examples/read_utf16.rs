@@ -14,7 +14,6 @@ fn main() -> Result<(), quick_xml::Error> {
     let file = File::open("tests/documents/encoding/utf16le-bom.xml")?;
     let transcoder = DecodingReader::new(BufReader::new(file));
     let mut reader = Reader::from_reader(transcoder);
-    reader.config_mut().trim_text(true);
 
     let mut buf = Vec::new();
     let mut version = XmlVersion::Implicit1_0;

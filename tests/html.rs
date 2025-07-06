@@ -10,7 +10,6 @@ fn html5() {
     test(
         include_str!("documents/html5.html"),
         include_str!("documents/html5.txt"),
-        false,
     );
 }
 
@@ -29,20 +28,18 @@ fn escaped_characters_html() {
             |EndElement(e)
             |EndDocument
         "#,
-        true,
     )
 }
 
 #[track_caller]
-fn test(input: &str, output: &str, trim: bool) {
-    test_bytes(input.as_bytes(), output.as_bytes(), trim);
+fn test(input: &str, output: &str) {
+    test_bytes(input.as_bytes(), output.as_bytes());
 }
 
 #[track_caller]
-fn test_bytes(input: &[u8], output: &[u8], trim: bool) {
+fn test_bytes(input: &[u8], output: &[u8]) {
     let mut reader = NsReader::from_reader(input);
     let config = reader.config_mut();
-    config.trim_text(trim);
     config.check_comments = true;
 
     let mut spec_lines = SpecIter(output).enumerate();

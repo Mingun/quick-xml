@@ -307,7 +307,6 @@ mod issue604 {
 #[test]
 fn issue622() {
     let mut reader = Reader::from_str("><");
-    reader.config_mut().trim_text(true);
 
     assert_eq!(
         reader.read_event().unwrap(),

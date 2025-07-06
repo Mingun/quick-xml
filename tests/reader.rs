@@ -273,7 +273,6 @@ mod read_to_end {
         fn text() {
             let mut r = Reader::from_str("<tag> text </tag>");
             //                            ^0   ^5    ^11
-            r.config_mut().trim_text(true);
 
             assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
             assert_eq!(r.read_to_end(QName("tag")).unwrap(), 5..11);
@@ -284,7 +283,6 @@ mod read_to_end {
         fn tag() {
             let mut r = Reader::from_str("<tag> <nested/> </tag>");
             //                            ^0   ^5         ^16
-            r.config_mut().trim_text(true);
 
             assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
             assert_eq!(r.read_to_end(QName("tag")).unwrap(), 5..16);
@@ -300,7 +298,6 @@ mod read_to_end {
         fn text() {
             let mut r = Reader::from_str("<tag> text </tag>");
             //                            ^0   ^5    ^11
-            r.config_mut().trim_text(true);
 
             let mut buf = Vec::new();
             assert_eq!(
@@ -315,7 +312,6 @@ mod read_to_end {
         fn tag() {
             let mut r = Reader::from_str("<tag> <nested/> </tag>");
             //                            ^0   ^5         ^16
-            r.config_mut().trim_text(true);
 
             let mut buf = Vec::new();
             assert_eq!(

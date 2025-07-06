@@ -126,7 +126,6 @@ fn one_event(c: &mut Criterion) {
             let mut r = Reader::from_str(&src);
             let mut nbtxt = black_box(0);
             let config = r.config_mut();
-            config.trim_text(true);
             config.check_end_names = false;
             match r.read_event() {
                 Ok(Event::Start(ref e)) => nbtxt += e.len(),
@@ -143,7 +142,6 @@ fn one_event(c: &mut Criterion) {
             let mut r = Reader::from_str(&src);
             let mut nbtxt = black_box(0);
             let config = r.config_mut();
-            config.trim_text(true);
             config.check_end_names = false;
             match r.read_event() {
                 Ok(Event::Comment(e)) => nbtxt += e.xml10_content().len(),
@@ -160,7 +158,6 @@ fn one_event(c: &mut Criterion) {
             let mut r = Reader::from_str(&src);
             let mut nbtxt = black_box(0);
             let config = r.config_mut();
-            config.trim_text(true);
             config.check_end_names = false;
             match r.read_event() {
                 Ok(Event::CData(ref e)) => nbtxt += e.len(),

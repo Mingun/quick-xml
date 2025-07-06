@@ -18,7 +18,6 @@ mod xml_decoding_reader {
     fn read_until_error(data: &[u8]) -> Error {
         let mut buf = Vec::new();
         let mut r = Reader::from_reader(DecodingReader::new(data));
-        r.config_mut().trim_text(true);
         loop {
             match r.read_event_into(&mut buf) {
                 Ok(Eof) => panic!("Expected encoding error, got EOF"),
@@ -98,7 +97,6 @@ mod xml_decoding_reader {
     fn test_koi8_r_encoding() {
         let mut buf = vec![];
         let mut r = Reader::from_reader(DecodingReader::new(RSS_DOC));
-        r.config_mut().trim_text(true);
         loop {
             match r.read_event_into(&mut buf) {
                 Ok(Text(e)) => {
@@ -201,7 +199,6 @@ mod legacy_decoding {
     fn koi8_r() {
         let mut buf = Vec::new();
         let mut r = Reader::from_reader(RSS_DOC);
-        r.config_mut().trim_text(true);
         loop {
             match r.read_event_into(&mut buf) {
                 Ok(Text(e)) => {

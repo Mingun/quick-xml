@@ -6,7 +6,6 @@ fn main() {
                <tag1>text3</tag1><tag1><tag2>text4</tag2></tag1>";
 
     let mut reader = Reader::from_str(xml);
-    reader.config_mut().trim_text(true);
 
     loop {
         match reader.read_event() {

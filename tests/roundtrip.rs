@@ -159,7 +159,6 @@ fn simple() {
 fn with_trim() {
     let input = include_str!("documents/test_writer.xml").trim();
     let mut reader = Reader::from_str(input);
-    reader.config_mut().trim_text(true);
     let mut writer = Writer::new(Vec::new());
     loop {
         match reader.read_event().unwrap() {
@@ -177,7 +176,6 @@ fn with_trim() {
 fn with_trim_ref() {
     let input = include_str!("documents/test_writer.xml").trim();
     let mut reader = Reader::from_str(input);
-    reader.config_mut().trim_text(true);
     let mut writer = Writer::new(Vec::new());
     loop {
         match reader.read_event().unwrap() {
@@ -196,7 +194,6 @@ fn with_trim_ref() {
 fn with_indent() {
     let input = include_str!("documents/test_writer_indent.xml");
     let mut reader = Reader::from_str(input);
-    reader.config_mut().trim_text(true);
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 4);
     loop {
         match reader.read_event().unwrap() {
@@ -216,7 +213,6 @@ fn with_indent() {
 fn with_indent_cdata() {
     let input = include_str!("documents/test_writer_indent_cdata.xml");
     let mut reader = Reader::from_str(input);
-    reader.config_mut().trim_text(true);
     let mut writer = Writer::new_with_indent(Vec::new(), b' ', 4);
     loop {
         match reader.read_event().unwrap() {

@@ -8,7 +8,6 @@ fn main() -> Result<(), quick_xml::Error> {
     use quick_xml::reader::Reader;
 
     let mut reader = Reader::from_file("tests/documents/document.xml")?;
-    reader.config_mut().trim_text(true);
 
     let mut buf = Vec::new();
 
