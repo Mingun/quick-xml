@@ -26,9 +26,12 @@
 
 ### Misc Changes
 
+- [#914]: Remove deprecated `.prefixes()`, `.resolve()`, `.resolve_attribute()`, and `.resolve_element()`
+  of `NsReader`. Use `.resolver().<...>` methods instead.
 - [#938]: Now `BytesText::xml_content`, `BytesCData::xml_content` and `BytesRef::xml_content`
   accepts `XmlVersion` parameter to apply correct EOL normalization rules.
 
+[#914]: https://github.com/tafia/quick-xml/pull/914
 [#938]: https://github.com/tafia/quick-xml/pull/938
 
 
