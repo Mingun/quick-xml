@@ -13,6 +13,7 @@ use crate::encoding::Decoder;
 use crate::errors::{Error, IllFormedError, SyntaxError};
 use crate::escape::{parse_number, EscapeError};
 use crate::events::{BytesRef, BytesText, Event};
+use crate::name::NamespaceResolver;
 use crate::parser::{DtdParser, ElementParser, Parser, PiParser};
 use crate::reader::state::ReaderState;
 use crate::XmlVersion;
@@ -1363,6 +1364,13 @@ struct StorageUnit<'i, 'e, E> {
     /// Version of XML standard used by this storage unit.
     version: XmlVersion,
 
+    /// A buffer to manage namespaces
+    ns_resolver: NamespaceResolver,
+    /// We cannot pop data from the namespace stack until returned `Empty` or `End`
+    /// event will be processed by the user, so we only mark that we should that
+    /// in the next [`Self::read_event()`] call.
+    pending_ns_pop: bool,
+
     /// Used to resolve unknown entities that would otherwise cause the parser
     /// to return an [`Error::UnrecognizedGeneralEntity`] error.
     entity_resolver: E,
@@ -1375,11 +1383,13 @@ where
         Self {
             parts: VecDeque::from([part]),
             version: XmlVersion::V1_0,
+            ns_resolver: NamespaceResolver::default(),
+            pending_ns_pop: false,
             entity_resolver,
         }
     }
 
-    fn read_event(&mut self, buf: &mut Vec<u8>) -> Result<ReadEvent<'i>, Error> {
+    fn read_event_impl(&mut self, buf: &mut Vec<u8>) -> Result<ReadEvent<'i>, Error> {
         while let Some(part) = self.parts.back_mut() {
             let event = match part.read_event(buf)? {
                 Event::Decl(e) => {
@@ -1442,6 +1452,47 @@ where
             return Ok(event);
         }
         Ok(ReadEvent::Event(XmlEvent::Eof))
+    }
+
+    fn read_event(&mut self, buf: &mut Vec<u8>) -> Result<ReadEvent<'i>, Error> {
+        self.pop();
+        let event = self.read_event_impl(buf);
+        self.process_event(event)
+    }
+
+    #[inline]
+    fn pop(&mut self) {
+        if self.pending_ns_pop {
+            self.ns_resolver.pop();
+            self.pending_ns_pop = false;
+        }
+    }
+
+    #[inline]
+    fn process_event(
+        &mut self,
+        event: Result<ReadEvent<'i>, Error>,
+    ) -> Result<ReadEvent<'i>, Error> {
+        match event {
+            Ok(ReadEvent::Event(XmlEvent::Start(e))) => {
+                self.ns_resolver.push(&e)?;
+                Ok(ReadEvent::Event(XmlEvent::Start(e)))
+            }
+            Ok(ReadEvent::Event(XmlEvent::Empty(e))) => {
+                self.ns_resolver.push(&e)?;
+                // notify next `read_event()` invocation that it needs to pop this
+                // namespace scope
+                self.pending_ns_pop = true;
+                Ok(ReadEvent::Event(XmlEvent::Empty(e)))
+            }
+            Ok(ReadEvent::Event(XmlEvent::End(e))) => {
+                // notify next `read_event()` invocation that it needs to pop this
+                // namespace scope
+                self.pending_ns_pop = true;
+                Ok(ReadEvent::Event(XmlEvent::End(e)))
+            }
+            e => e,
+        }
     }
 }
 
@@ -1524,6 +1575,31 @@ where
         Self::new(EntityReader::InternalOwned(reader), entity_resolver_factory)
     }
 
+    /// The same, as [`borrowed`](Self::borrowed), but creates from namespace-aware reader.
+    /// The state of the reader will be preserved.
+    pub fn borrowed_ns(reader: NsReader<&'i [u8]>, mut entity_resolver_factory: EF) -> Self {
+        let resolver = entity_resolver_factory.new_resolver();
+        Self {
+            units: VecDeque::from([reader.to_borrowed_storage_unit(resolver)]),
+            buffer: Vec::new(),
+            entity_resolver_factory,
+        }
+    }
+
+    /// The same, as [`buffered`](Self::buffered), but creates from namespace-aware reader.
+    /// The state of the reader will be preserved.
+    pub fn buffered_ns(
+        reader: NsReader<Box<dyn BufRead + 'i>>,
+        mut entity_resolver_factory: EF,
+    ) -> Self {
+        let resolver = entity_resolver_factory.new_resolver();
+        Self {
+            units: VecDeque::from([reader.to_buffered_storage_unit(resolver)]),
+            buffer: Vec::new(),
+            entity_resolver_factory,
+        }
+    }
+
     /// Returns event which, if possible, would borrow from the source and contains
     /// a copy of data if borrowing is impossible (for example, event from another
     /// document resolved by entity reference).
@@ -1547,6 +1623,17 @@ where
             }
         }
         Ok(XmlEvent::Eof)
+    }
+
+    /// Returns a storage of namespace bindings associated with this reader.
+    ///
+    /// Note, that this object may change after reading new event, if new event
+    /// will be from the new storage unit. That is possible only if custom
+    /// [`EntityResolver`] is used.
+    #[inline]
+    pub fn resolver(&self) -> &NamespaceResolver {
+        // SAFETY: At least one storage unit should always be there
+        &self.units.back().unwrap().ns_resolver
     }
 }
 
