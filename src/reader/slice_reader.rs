@@ -362,13 +362,14 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         let mut bang_type = BangType::new(self.get(2).copied())?;
 
         if let Some((bytes, i)) = bang_type.parse(&[], self) {
-            *position += i as u64;
-            *self = &self[i..];
+            let consumed = i + 1; // +1 for `>` which we do not include
+            *position += consumed as u64;
+            *self = &self[consumed..];
             return Ok((bang_type, bytes));
         }
 
         *position += self.len() as u64;
-        Err(bang_type.to_err().into())
+        Err(Error::Syntax(bang_type.to_err()))
     }
 
     #[inline]

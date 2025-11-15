@@ -1179,17 +1179,17 @@ impl BangType {
                             // check_comments enabled option. XML standard requires that comment
                             // will not end with `--->` sequence because this is a special case of
                             // `--` in the comment (https://www.w3.org/TR/xml11/#sec-comments)
-                            return Some((&chunk[..i], i + 1)); // +1 for `>`
+                            return Some((&chunk[..i], i));
                         }
                         // End sequence `-|->` was splitted at |
                         //        buf --/   \-- chunk
                         if i == 1 && buf.ends_with(b"-") && chunk[0] == b'-' {
-                            return Some((&chunk[..i], i + 1)); // +1 for `>`
+                            return Some((&chunk[..i], i));
                         }
                         // End sequence `--|>` was splitted at |
                         //         buf --/   \-- chunk
                         if i == 0 && buf.ends_with(b"--") {
-                            return Some((&[], i + 1)); // +1 for `>`
+                            return Some((&[], i));
                         }
                     }
                 }
@@ -1197,17 +1197,17 @@ impl BangType {
             Self::CData => {
                 for i in memchr::memchr_iter(b'>', chunk) {
                     if chunk[..i].ends_with(b"]]") {
-                        return Some((&chunk[..i], i + 1)); // +1 for `>`
+                        return Some((&chunk[..i], i));
                     }
                     // End sequence `]|]>` was splitted at |
                     //        buf --/   \-- chunk
                     if i == 1 && buf.ends_with(b"]") && chunk[0] == b']' {
-                        return Some((&chunk[..i], i + 1)); // +1 for `>`
+                        return Some((&chunk[..i], i));
                     }
                     // End sequence `]]|>` was splitted at |
                     //         buf --/   \-- chunk
                     if i == 0 && buf.ends_with(b"]]") {
-                        return Some((&[], i + 1)); // +1 for `>`
+                        return Some((&[], i));
                     }
                 }
             }

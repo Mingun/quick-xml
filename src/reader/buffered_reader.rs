@@ -267,7 +267,8 @@ macro_rules! impl_buffered_source {
                 };
                 // We only parse from start because we don't want to consider
                 // whatever is in the buffer before the bang element
-                if let Some((consumed, used)) = bang_type.parse(&buf[start..], available) {
+                if let Some((consumed, i)) = bang_type.parse(&buf[start..], available) {
+                    let used = i + 1; // +1 for `>` which we do not include
                     buf.extend_from_slice(consumed);
 
                     self $(.$reader)? .consume(used);
@@ -286,7 +287,7 @@ macro_rules! impl_buffered_source {
             }
 
             *position += read;
-            Err(bang_type.to_err().into())
+            Err(Error::Syntax(bang_type.to_err()))
         }
 
         #[inline]

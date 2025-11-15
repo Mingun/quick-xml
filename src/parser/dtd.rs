@@ -103,8 +103,7 @@ impl DtdParser {
                             b'>' => {
                                 *self = Self::Finished;
                                 let len = chunk.len() - cur.len() + i;
-                                // +1 for `>`
-                                return Some((&chunk[..len], len + 1));
+                                return Some((&chunk[..len], len));
                             }
                             _ => {}
                         }
@@ -146,8 +145,7 @@ impl DtdParser {
                     if let Some(i) = memchr::memchr(b'>', cur) {
                         *self = Self::Finished;
                         let len = chunk.len() - cur.len() + i;
-                        // +1 for `>`
-                        return Some((&chunk[..len], len + 1));
+                        return Some((&chunk[..len], len));
                     }
                     break;
                 }
