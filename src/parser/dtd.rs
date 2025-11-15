@@ -69,7 +69,7 @@ impl DtdParser {
     /// # Parameters (as same as `reader::BangType::parse`)
     /// - `buf`: buffer with data consumed on previous iterations
     /// - `chunk`: data read on current iteration and not yet consumed from reader
-    pub fn feed<'b>(&mut self, buf: &[u8], chunk: &'b [u8]) -> Option<(&'b [u8], usize)> {
+    pub fn feed(&mut self, buf: &[u8], chunk: &[u8]) -> Option<usize> {
         // This method assumes the DTD is well-formed.
         // Since this crate does not support parsing DTDs, the inability to read non-well-formed DTDs
         // is not particularly problematic; the only point of interest is reporting well-formed DTDs
@@ -102,8 +102,7 @@ impl DtdParser {
                             }
                             b'>' => {
                                 *self = Self::Finished;
-                                let len = chunk.len() - cur.len() + i;
-                                return Some((&chunk[..len], len));
+                                return Some(chunk.len() - cur.len() + i);
                             }
                             _ => {}
                         }
@@ -144,8 +143,7 @@ impl DtdParser {
                 Self::AfterInternalSubset => {
                     if let Some(i) = memchr::memchr(b'>', cur) {
                         *self = Self::Finished;
-                        let len = chunk.len() - cur.len() + i;
-                        return Some((&chunk[..len], len));
+                        return Some(chunk.len() - cur.len() + i);
                     }
                     break;
                 }
