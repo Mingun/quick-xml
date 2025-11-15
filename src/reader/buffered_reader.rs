@@ -256,35 +256,33 @@ macro_rules! impl_buffered_source {
             };
 
             loop {
-                match self $(.$reader)? .fill_buf() $(.$await)? {
-                    // Note: Do not update position, so the error points to
-                    // somewhere sane rather than at the EOF
+                let available = match self $(.$reader)? .fill_buf() $(.$await)? {
                     Ok(n) if n.is_empty() => break,
-                    Ok(available) => {
-                        // We only parse from start because we don't want to consider
-                        // whatever is in the buffer before the bang element
-                        if let Some((consumed, used)) = bang_type.parse(&buf[start..], available) {
-                            buf.extend_from_slice(consumed);
-
-                            self $(.$reader)? .consume(used);
-                            read += used as u64;
-
-                            *position += read;
-                            return Ok((bang_type, &buf[start..]));
-                        } else {
-                            buf.extend_from_slice(available);
-
-                            let used = available.len();
-                            self $(.$reader)? .consume(used);
-                            read += used as u64;
-                        }
-                    }
+                    Ok(n) => n,
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
                     Err(e) => {
                         *position += read;
                         return Err(Error::Io(e.into()));
                     }
+                };
+                // We only parse from start because we don't want to consider
+                // whatever is in the buffer before the bang element
+                if let Some((consumed, used)) = bang_type.parse(&buf[start..], available) {
+                    buf.extend_from_slice(consumed);
+
+                    self $(.$reader)? .consume(used);
+                    read += used as u64;
+
+                    *position += read;
+                    return Ok((bang_type, &buf[start..]));
                 }
+
+                // The `>` symbol not yet found, continue reading
+                buf.extend_from_slice(available);
+
+                let used = available.len();
+                self $(.$reader)? .consume(used);
+                read += used as u64;
             }
 
             *position += read;
