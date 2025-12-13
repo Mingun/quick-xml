@@ -2329,7 +2329,7 @@ impl<'a> PayloadEvent<'a> {
 /// An intermediate reader that consumes [`PayloadEvent`]s and produces final [`DeEvent`]s.
 /// [`PayloadEvent::Text`] events, that followed by any event except
 /// [`PayloadEvent::Text`] or [`PayloadEvent::CData`], are trimmed from the end.
-struct XmlReader<'i, R: XmlRead<'i>, E: EntityResolver = PredefinedEntityResolver> {
+struct LookaheadReader<'i, R: XmlRead<'i>, E: EntityResolver = PredefinedEntityResolver> {
     /// A source of low-level XML events
     reader: R,
     /// Intermediate event, that could be returned by the next call to `next()`.
@@ -2345,7 +2345,7 @@ struct XmlReader<'i, R: XmlRead<'i>, E: EntityResolver = PredefinedEntityResolve
     entity_resolver: E,
 }
 
-impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
+impl<'i, R: XmlRead<'i>, E: EntityResolver> LookaheadReader<'i, R, E> {
     fn new(mut reader: R, entity_resolver: E) -> Self {
         // Lookahead by one event immediately, so we do not need to check in the
         // loop if we need lookahead or not
@@ -2522,7 +2522,7 @@ where
     R: XmlRead<'de>,
 {
     /// An XML reader that streams events into this deserializer
-    reader: XmlReader<'de, R, E>,
+    reader: LookaheadReader<'de, R, E>,
 
     /// When deserializing sequences sometimes we have to skip unwanted events.
     /// That events should be stored and then replayed. This is a replay buffer,
@@ -2568,7 +2568,7 @@ where
     ///  - [`Deserializer::from_reader`]
     fn new(reader: R, entity_resolver: E) -> Self {
         Self {
-            reader: XmlReader::new(reader, entity_resolver),
+            reader: LookaheadReader::new(reader, entity_resolver),
 
             #[cfg(feature = "overlapped-lists")]
             read: VecDeque::new(),
