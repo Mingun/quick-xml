@@ -18,6 +18,8 @@
 
 ### New Features
 
+- [#851]: Implement DOM handling. See new types in `quick_xml::reader::dom` module.
+
 ### Bug Fixes
 
 - [#1007]: Remove error-prone implementations of `Hash`, `PartialOrd`, and `Ord` from all
@@ -27,6 +29,7 @@
 
 - [#1009]: Split of `BytesComment` from `BytesText`.
 
+[#851]: https://github.com/tafia/quick-xml/issues/851
 [#1005]: https://github.com/tafia/quick-xml/pull/1005
 [#1007]: https://github.com/tafia/quick-xml/pull/1007
 [#1009]: https://github.com/tafia/quick-xml/pull/1009
