@@ -11,6 +11,8 @@ use crate::events::{BytesRef, Event};
 use crate::parser::{DtdParser, ElementParser, Parser, PiParser};
 use crate::reader::state::ReaderState;
 
+pub mod dom;
+
 /// A struct that holds a parser configuration.
 ///
 /// Current parser configuration can be retrieved by calling [`Reader::config()`]

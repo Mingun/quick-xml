@@ -663,6 +663,22 @@ impl<'a> BytesText<'a> {
         self.content = trim_cow(replace(&mut self.content, Cow::Borrowed(b"")), trim_xml_end);
         self.content.is_empty()
     }
+
+    /// Checks if XML event contains only [whitespace characters].
+    ///
+    /// Note, that according to the XML specification, parser operates over the
+    /// normalized text, so this will return `true` if event contains only
+    /// ` `, `\n` and `\t` characters, but original text may contain additional
+    /// characters.
+    ///
+    /// [whitespace characters]: https://www.w3.org/TR/xml11/#NT-S
+    pub const fn is_xml_spaces(&self) -> bool {
+        // If something was not trimmed, then content contains not only spaces
+        match self.content {
+            Cow::Borrowed(text) => trim_xml_start(text).is_empty(),
+            Cow::Owned(ref text) => trim_xml_start(text.as_slice()).is_empty(),
+        }
+    }
 }
 
 impl<'a> Debug for BytesText<'a> {

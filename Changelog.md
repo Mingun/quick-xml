@@ -16,9 +16,13 @@
 
 ### New Features
 
+- [#851]: Implement DOM handling. See new types in `quick_xml::reader::dom` module.
+
 ### Bug Fixes
 
 ### Misc Changes
+
+[#851]: https://github.com/tafia/quick-xml/issues/851
 
 
 ## 0.39.0 -- 2026-01-11
