@@ -172,7 +172,7 @@ fn test_escaped_content() {
                 "content unexpected: expecting 'test', got '{:?}'",
                 from_utf8(&e)
             );
-            match e.xml_content() {
+            match e.xml10_content() {
                 Ok(c) => assert_eq!(c, "test"),
                 Err(e) => panic!(
                     "cannot escape content at position {}: {:?}",
