@@ -21,7 +21,13 @@
 
 ### Bug Fixes
 
+- [#938]: Use correct rules for EOL normalization in `Deserializer` when parse XML 1.0 documents.
+  Previously XML 1.1. rules was applied.
+
 ### Misc Changes
+
+- [#938]: Now `BytesText::xml_content`, `BytesCData::xml_content` and `BytesRef::xml_content`
+  accepts `XmlVersion` parameter to apply correct EOL normalization rules.
 
 [#938]: https://github.com/tafia/quick-xml/pull/938
 

@@ -660,8 +660,11 @@ impl<'a> BytesText<'a> {
 
     /// Alias for [`xml11_content()`](Self::xml11_content).
     #[inline]
-    pub fn xml_content(&self) -> Result<Cow<'a, str>, EncodingError> {
-        self.xml11_content()
+    pub fn xml_content(&self, version: XmlVersion) -> Result<Cow<'a, str>, EncodingError> {
+        match version {
+            XmlVersion::V1_0 => self.xml10_content(),
+            XmlVersion::V1_1 => self.xml11_content(),
+        }
     }
 
     /// Alias for [`xml10_content()`](Self::xml10_content).
@@ -968,8 +971,11 @@ impl<'a> BytesCData<'a> {
 
     /// Alias for [`xml11_content()`](Self::xml11_content).
     #[inline]
-    pub fn xml_content(&self) -> Result<Cow<'a, str>, EncodingError> {
-        self.xml11_content()
+    pub fn xml_content(&self, version: XmlVersion) -> Result<Cow<'a, str>, EncodingError> {
+        match version {
+            XmlVersion::V1_0 => self.xml10_content(),
+            XmlVersion::V1_1 => self.xml11_content(),
+        }
     }
 
     /// Alias for [`xml10_content()`](Self::xml10_content).
@@ -1680,8 +1686,11 @@ impl<'a> BytesRef<'a> {
 
     /// Alias for [`xml11_content()`](Self::xml11_content).
     #[inline]
-    pub fn xml_content(&self) -> Result<Cow<'a, str>, EncodingError> {
-        self.xml11_content()
+    pub fn xml_content(&self, version: XmlVersion) -> Result<Cow<'a, str>, EncodingError> {
+        match version {
+            XmlVersion::V1_0 => self.xml10_content(),
+            XmlVersion::V1_1 => self.xml11_content(),
+        }
     }
 
     /// Alias for [`xml10_content()`](Self::xml10_content).
