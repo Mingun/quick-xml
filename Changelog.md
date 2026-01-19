@@ -16,9 +16,14 @@
 
 ### New Features
 
+- [#938]: Add new enumeration `XmlVersion` and typified getter `BytesDecl::xml_version()`.
+- [#938]: Add new error variant `IllFormedError::UnknownVersion`.
+
 ### Bug Fixes
 
 ### Misc Changes
+
+[#938]: https://github.com/tafia/quick-xml/pull/938
 
 
 ## 0.39.2 -- 2026-02-20
@@ -41,7 +46,7 @@
 
 ### New Features
 
-- [#598]: Add method `NamespaceResolver::set_level` which may be helpful in som circumstances.
+- [#598]: Add method `NamespaceResolver::set_level` which may be helpful in some circumstances.
 
 ### Bug Fixes
 
