@@ -1734,7 +1734,7 @@ impl<'i> BytesDecl<'i> {
     /// Gets the actual encoding using [_get an encoding_](https://encoding.spec.whatwg.org/#concept-encoding-get)
     /// algorithm.
     ///
-    /// If encoding in not known, or `encoding` key was not found, returns `None`.
+    /// If encoding is not known, or `encoding` key was not found, returns `None`.
     /// In case of duplicated `encoding` key, encoding, corresponding to the first
     /// one, is returned.
     #[cfg(feature = "encoding")]
@@ -1742,6 +1742,32 @@ impl<'i> BytesDecl<'i> {
         self.encoding()
             .and_then(|e| e.ok())
             .and_then(|e| Encoding::for_label(e.as_bytes()))
+    }
+
+    /// Gets the standalone flag of the document.
+    ///
+    /// The `true` value indicates that there are no external markup declarations
+    /// in the document which affect the information passed from the XML processor
+    /// (quick-xml) to the application (user of quick-xml). The `false` value
+    /// indicates that there are or may be such external markup declarations.
+    ///
+    /// Note that the standalone document declaration only denotes the presence
+    /// of external declarations; the presence, in a document, of references to
+    /// external entities, when those entities are internally declared, does not
+    /// change its standalone status.
+    ///
+    /// If there are no external markup declarations, the standalone document
+    /// declaration has no meaning. If there are external markup declarations
+    /// but there is no standalone document declaration, the `false` value is assumed.
+    ///
+    /// If standalone flag is missed or contains something other that `yes` or `no`,
+    /// then `None` is returned.
+    pub fn is_standalone(&self) -> Option<bool> {
+        match self.standalone().and_then(|s| s.ok()).as_deref() {
+            Some("yes") => Some(true),
+            Some("no") => Some(false),
+            _ => None,
+        }
     }
 
     /// Converts the event into an owned event.
