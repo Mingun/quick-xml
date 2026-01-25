@@ -338,10 +338,10 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         P: Parser,
     {
         if let Some(i) = parser.feed(self) {
-            // +1 for `>` which we do not include
-            *position += i as u64 + 1;
-            let bytes = &self[..i];
-            *self = &self[i + 1..];
+            let used = i + 1; // +1 for `>`
+            *position += used as u64;
+            let (bytes, rest) = self.split_at(used);
+            *self = rest;
             return Ok(bytes);
         }
 

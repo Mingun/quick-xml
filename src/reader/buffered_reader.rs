@@ -211,11 +211,11 @@ macro_rules! impl_buffered_source {
                 };
 
                 if let Some(i) = parser.feed(available) {
-                    buf.extend_from_slice(&available[..i]);
+                    let used = i + 1; // +1 for `>`
+                    buf.extend_from_slice(&available[..used]);
 
-                    // +1 for `>` which we do not include
-                    self $(.$reader)? .consume(i + 1);
-                    read += i as u64 + 1;
+                    self $(.$reader)? .consume(used);
+                    read += used as u64;
 
                     *position += read;
                     return Ok(&buf[start..]);

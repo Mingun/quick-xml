@@ -189,16 +189,21 @@ impl ReaderState {
     /// Wraps content of `buf` into the [`Event::End`] event. Does the check that
     /// end name matches the last opened start name if `self.config.check_end_names` is set.
     ///
-    /// `buf` contains data between `<` and `>`, for example `/tag`.
+    /// `buf` contains data between `<` and up to, including, `>`, for example `</tag>`.
     pub fn emit_end<'b>(&mut self, buf: &'b [u8]) -> Result<Event<'b>> {
         debug_assert!(
             buf.starts_with(b"</"),
             "end tag must start from '</':\n{:?}",
             crate::utils::Bytes(buf)
         );
+        debug_assert!(
+            buf.ends_with(b">"),
+            "end tag must end with '>':\n{:?}",
+            crate::utils::Bytes(buf)
+        );
 
-        // Strip the `</` characters. `content` contains data between `</` and `>`
-        let content = &buf[2..];
+        // Strip the `</` and `>` characters. `content` contains data between `</` and `>`
+        let content = &buf[2..buf.len() - 1];
         // XML standard permits whitespaces after the markup name in closing tags.
         // Let's strip them from the buffer before comparing tag names.
         let name = if self.config.trim_markup_names_in_closing_tags {
@@ -224,8 +229,7 @@ impl ReaderState {
                         self.opened_buffer.truncate(start);
 
                         // Report error at start of the end tag at `<` character
-                        // -1 for `>`
-                        self.last_error_offset = self.offset - buf.len() as u64 - 1;
+                        self.last_error_offset = self.offset - buf.len() as u64;
                         return Err(Error::IllFormed(IllFormedError::MismatchedEndTag {
                             expected,
                             found: decoder.decode(name).unwrap_or_default().into_owned(),
@@ -238,8 +242,7 @@ impl ReaderState {
             None => {
                 if !self.config.allow_unmatched_ends {
                     // Report error at start of the end tag at `<` character
-                    // -1 for `>`
-                    self.last_error_offset = self.offset - buf.len() as u64 - 1;
+                    self.last_error_offset = self.offset - buf.len() as u64;
                     return Err(Error::IllFormed(IllFormedError::UnmatchedEndTag(
                         decoder.decode(name).unwrap_or_default().into_owned(),
                     )));
@@ -261,17 +264,17 @@ impl ReaderState {
             crate::utils::Bytes(buf)
         );
         debug_assert!(
-            buf.ends_with(b"?"),
-            "processing instruction or XML declaration must end with '?':\n{:?}",
+            buf.ends_with(b"?>"),
+            "processing instruction or XML declaration must end with '?>':\n{:?}",
             crate::utils::Bytes(buf)
         );
 
         let len = buf.len();
         // We accept at least <??>
-        //                    ~~~ - len = 3
-        if len > 2 {
-            // Cut of `<?` and `?` from start and end
-            let content = &buf[2..len - 1];
+        //                    ~~~~ - len = 4
+        if len > 3 {
+            // Cut of `<?` and `?>` from start and end
+            let content = &buf[2..len - 2];
             let len = content.len();
 
             if content.starts_with(b"xml") && (len == 3 || is_whitespace(content[3])) {
@@ -294,10 +297,10 @@ impl ReaderState {
                 )))
             }
         } else {
-            // <?....>
-            // ~~~~~~ - `buf` contains that and `self.offset` is after `>`.
-            // ^------- We report error at that position, so we need to subtract 1 and buf len
-            self.last_error_offset = self.offset - len as u64 - 1;
+            // <?...?>
+            // ~~~~~~~- `buf` contains that and `self.offset` is after `>`.
+            // ^------- We report error at that position, so we need to subtract buf len
+            self.last_error_offset = self.offset - len as u64;
             Err(Error::Syntax(PiParser(false).eof_error(buf)))
         }
     }
@@ -312,10 +315,15 @@ impl ReaderState {
             "start or empty tag must start from '<':\n{:?}",
             crate::utils::Bytes(content)
         );
+        debug_assert!(
+            content.ends_with(b">"),
+            "start or empty tag must end with '>':\n{:?}",
+            crate::utils::Bytes(content)
+        );
 
         // strip `<`
         let content = &content[1..];
-        if let Some(content) = content.strip_suffix(b"/") {
+        if let Some(content) = content.strip_suffix(b"/>") {
             // This is self-closed tag `<something/>`
             let event = BytesStart::wrap(content, name_len(content), self.decoder());
 
@@ -328,6 +336,8 @@ impl ReaderState {
                 Event::Empty(event)
             }
         } else {
+            // strip `>`
+            let content = &content[..content.len() - 1];
             let event = BytesStart::wrap(content, name_len(content), self.decoder());
 
             // #514: Always store names event when .check_end_names == false,

@@ -1842,7 +1842,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<")
+                            Bytes(b"<>")
                         );
                         assert_eq!(position, 2);
                     }
@@ -1856,7 +1856,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<tag")
+                            Bytes(b"<tag>")
                         );
                         assert_eq!(position, 5);
                     }
@@ -1870,7 +1870,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:")
+                            Bytes(b"<:>")
                         );
                         assert_eq!(position, 3);
                     }
@@ -1884,7 +1884,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:tag")
+                            Bytes(b"<:tag>")
                         );
                         assert_eq!(position, 6);
                     }
@@ -1898,7 +1898,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"<tag  attr-1=">"  attr2  =  '>'  3attr"#)
+                            Bytes(br#"<tag  attr-1=">"  attr2  =  '>'  3attr>"#)
                         );
                         assert_eq!(position, 39);
                     }
@@ -1917,7 +1917,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</")
+                            Bytes(b"</>")
                         );
                         assert_eq!(position, 3);
                     }
@@ -1931,7 +1931,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<tag/")
+                            Bytes(b"<tag/>")
                         );
                         assert_eq!(position, 6);
                     }
@@ -1945,7 +1945,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:/")
+                            Bytes(b"<:/>")
                         );
                         assert_eq!(position, 4);
                     }
@@ -1959,7 +1959,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:tag/")
+                            Bytes(b"<:tag/>")
                         );
                         assert_eq!(position, 7);
                     }
@@ -1973,7 +1973,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/"#)
+                            Bytes(br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#)
                         );
                         assert_eq!(position, 42);
                     }
@@ -1992,7 +1992,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</ ")
+                            Bytes(b"</ >")
                         );
                         assert_eq!(position, 4);
                     }
@@ -2006,7 +2006,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</tag")
+                            Bytes(b"</tag>")
                         );
                         assert_eq!(position, 6);
                     }
@@ -2020,7 +2020,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</:")
+                            Bytes(b"</:>")
                         );
                         assert_eq!(position, 4);
                     }
@@ -2034,7 +2034,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</:tag")
+                            Bytes(b"</:tag>")
                         );
                         assert_eq!(position, 7);
                     }
@@ -2048,7 +2048,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"</tag  attr-1=">"  attr2  =  '>'  3attr"#)
+                            Bytes(br#"</tag  attr-1=">"  attr2  =  '>'  3attr>"#)
                         );
                         assert_eq!(position, 40);
                     }
