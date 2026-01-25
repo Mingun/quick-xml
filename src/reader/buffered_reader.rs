@@ -73,21 +73,15 @@ macro_rules! impl_buffered_source {
                 match memchr::memchr2(b'<', b'&', available) {
                     // Special handling is needed only on the first iteration.
                     // On next iterations we already read something and should emit Text event
-                    Some(0) if read == 0 && available[0] == b'<' => {
-                        self $(.$reader)? .consume(1);
-                        *position += 1;
-                        return ReadTextResult::Markup(buf);
-                    }
+                    Some(0) if read == 0 && available[0] == b'<' => return ReadTextResult::Markup(buf),
                     // Do not consume `&` because it may be lone and we would be need to
                     // return it as part of Text event
                     Some(0) if read == 0 => return ReadTextResult::Ref(buf),
                     Some(i) if available[i] == b'<' => {
                         buf.extend_from_slice(&available[..i]);
 
-                        // +1 to skip `<`
-                        let used = i + 1;
-                        self $(.$reader)? .consume(used);
-                        read += used as u64;
+                        self $(.$reader)? .consume(i);
+                        read += i as u64;
 
                         *position += read;
                         return ReadTextResult::UpToMarkup(&buf[start..]);
@@ -151,9 +145,22 @@ macro_rules! impl_buffered_source {
                 }
 
                 match memchr::memchr3(b';', b'&', b'<', available) {
+                    Some(i) if available[i] == b';' => {
+                        buf.extend_from_slice(&available[..i]);
+
+                        // +1 -- skip the end `;`
+                        let used = i + 1;
+                        self $(.$reader)? .consume(used);
+                        read += used as u64;
+
+                        *position += read;
+
+                        return ReadRefResult::Ref(&buf[start..]);
+                    }
                     // Do not consume `&` because it may be lone and we would be need to
                     // return it as part of Text event
-                    Some(i) if available[i] == b'&' => {
+                    Some(i) => {
+                        let is_amp = available[i] == b'&';
                         buf.extend_from_slice(&available[..i]);
 
                         self $(.$reader)? .consume(i);
@@ -161,21 +168,8 @@ macro_rules! impl_buffered_source {
 
                         *position += read;
 
-                        return ReadRefResult::UpToRef(&buf[start..]);
-                    }
-                    Some(i) => {
-                        let is_end = available[i] == b';';
-                        buf.extend_from_slice(&available[..i]);
-
-                        // +1 -- skip the end `;` or `<`
-                        let used = i + 1;
-                        self $(.$reader)? .consume(used);
-                        read += used as u64;
-
-                        *position += read;
-
-                        return if is_end {
-                            ReadRefResult::Ref(&buf[start..])
+                        return if is_amp {
+                            ReadRefResult::UpToRef(&buf[start..])
                         } else {
                             ReadRefResult::UpToMarkup(&buf[start..])
                         };
@@ -243,14 +237,20 @@ macro_rules! impl_buffered_source {
             buf: &'b mut Vec<u8>,
             position: &mut u64,
         ) -> Result<(BangType, &'b [u8])> {
-            // Peeked one bang ('!') before being called, so it's guaranteed to
-            // start with it.
+            // Peeked '<!' before being called, so it's guaranteed to start with it.
             let start = buf.len();
-            let mut read = 1;
+            let mut read = 2;
+            buf.push(b'<');
             buf.push(b'!');
-            self $(.$reader)? .consume(1);
+            self $(.$reader)? .consume(2);
 
-            let mut bang_type = BangType::new(self.peek_one() $(.$await)? ?)?;
+            let mut bang_type = loop {
+                break match self $(.$reader)? .fill_buf() $(.$await)? {
+                    Ok(n) => BangType::new(n.first().cloned())?,
+                    Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                    Err(e) => return Err(Error::Io(e.into())),
+                };
+            };
 
             loop {
                 match self $(.$reader)? .fill_buf() $(.$await)? {
@@ -310,13 +310,19 @@ macro_rules! impl_buffered_source {
 
         #[inline]
         $($async)? fn peek_one(&mut self) -> io::Result<Option<u8>> {
-            loop {
+            let available = loop {
                 break match self $(.$reader)? .fill_buf() $(.$await)? {
-                    Ok(n) => Ok(n.first().cloned()),
+                    Ok(n) => n,
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                    Err(e) => Err(e),
+                    Err(e) => return Err(e),
                 };
-            }
+            };
+            debug_assert!(
+                available.starts_with(b"<"),
+                "markup must start from '<':\n{:?}",
+                crate::utils::Bytes(available)
+            );
+            Ok(available.get(1).cloned())
         }
     };
 }

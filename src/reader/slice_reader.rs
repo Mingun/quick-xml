@@ -265,18 +265,14 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
     fn read_text(&mut self, _buf: (), position: &mut u64) -> ReadTextResult<'a, ()> {
         // Search for start of markup or an entity or character reference
         match memchr::memchr2(b'<', b'&', self) {
-            Some(0) if self[0] == b'<' => {
-                *self = &self[1..];
-                *position += 1;
-                ReadTextResult::Markup(())
-            }
+            Some(0) if self[0] == b'<' => ReadTextResult::Markup(()),
             // Do not consume `&` because it may be lone and we would be need to
             // return it as part of Text event
             Some(0) => ReadTextResult::Ref(()),
             Some(i) if self[i] == b'<' => {
-                let bytes = &self[..i];
-                *self = &self[i + 1..];
-                *position += i as u64 + 1;
+                let (bytes, rest) = self.split_at(i);
+                *self = rest;
+                *position += i as u64;
                 ReadTextResult::UpToMarkup(bytes)
             }
             Some(i) => {
@@ -303,25 +299,25 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         );
         // Search for the end of reference or a start of another reference or a markup
         match memchr::memchr3(b';', b'&', b'<', &self[1..]) {
+            Some(i) if self[i + 1] == b';' => {
+                let end = i + 1;
+                let bytes = &self[..end];
+                // +1 -- skip the end `;`
+                *self = &self[end + 1..];
+                *position += end as u64 + 1;
+
+                ReadRefResult::Ref(bytes)
+            }
             // Do not consume `&` because it may be lone and we would be need to
             // return it as part of Text event
-            Some(i) if self[i + 1] == b'&' => {
+            Some(i) => {
+                let is_amp = self[i + 1] == b'&';
                 let (bytes, rest) = self.split_at(i + 1);
                 *self = rest;
                 *position += i as u64 + 1;
 
-                ReadRefResult::UpToRef(bytes)
-            }
-            Some(i) => {
-                let end = i + 1;
-                let is_end = self[end] == b';';
-                let bytes = &self[..end];
-                // +1 -- skip the end `;` or `<`
-                *self = &self[end + 1..];
-                *position += end as u64 + 1;
-
-                if is_end {
-                    ReadRefResult::Ref(bytes)
+                if is_amp {
+                    ReadRefResult::UpToRef(bytes)
                 } else {
                     ReadRefResult::UpToMarkup(bytes)
                 }
@@ -358,12 +354,12 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         // Peeked one bang ('!') before being called, so it's guaranteed to
         // start with it.
         debug_assert!(
-            self.starts_with(b"!"),
-            "`read_bang_element` must be called at `!`:\n{:?}",
+            self.starts_with(b"<!"),
+            "`read_bang_element` must be called at `<!`:\n{:?}",
             crate::utils::Bytes(self)
         );
 
-        let mut bang_type = BangType::new(self[1..].first().copied())?;
+        let mut bang_type = BangType::new(self.get(2).copied())?;
 
         if let Some((bytes, i)) = bang_type.parse(&[], self) {
             *position += i as u64;
@@ -388,7 +384,12 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
 
     #[inline]
     fn peek_one(&mut self) -> io::Result<Option<u8>> {
-        Ok(self.first().copied())
+        debug_assert!(
+            self.starts_with(b"<"),
+            "markup must start from '<':\n{:?}",
+            crate::utils::Bytes(self)
+        );
+        Ok(self.get(1).copied())
     }
 }
 

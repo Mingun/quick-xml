@@ -18,7 +18,11 @@
 
 ### Bug Fixes
 
+- [#936]: Fix incorrect result of `.read_text()` when it is called after reading `Text` or `GeneralRef` event.
+
 ### Misc Changes
+
+[#936]: https://github.com/tafia/quick-xml/pull/936
 
 
 ## 0.39.0 -- 2026-01-11
