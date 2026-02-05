@@ -80,10 +80,10 @@ impl ReaderState {
     /// - Doctype (uppercase): `!D...`
     /// - Doctype (lowercase): `!d...`
     pub fn emit_bang<'b>(&mut self, bang_type: BangType, buf: &'b [u8]) -> Result<Event<'b>> {
-        debug_assert_eq!(
-            buf.first(),
-            Some(&b'!'),
-            "CDATA, comment or DOCTYPE should start from '!'"
+        debug_assert!(
+            buf.starts_with(b"!"),
+            "CDATA, comment or DOCTYPE must start from '!':\n{:?}",
+            crate::utils::Bytes(buf)
         );
 
         let uncased_starts_with = |string: &[u8], prefix: &[u8]| {
@@ -93,7 +93,11 @@ impl ReaderState {
         let len = buf.len();
         match bang_type {
             BangType::Comment if buf.starts_with(b"!--") => {
-                debug_assert!(buf.ends_with(b"--"));
+                debug_assert!(
+                    buf.ends_with(b"--"),
+                    "comment must end with '--':\n{:?}",
+                    crate::utils::Bytes(buf)
+                );
                 if self.config.check_comments {
                     // search if '--' not in comments
                     let mut haystack = &buf[3..len - 2];
@@ -134,7 +138,11 @@ impl ReaderState {
             // Even HTML5 required uppercase only:
             // https://html.spec.whatwg.org/multipage/parsing.html#markup-declaration-open-state
             BangType::CData if buf.starts_with(b"![CDATA[") => {
-                debug_assert!(buf.ends_with(b"]]"));
+                debug_assert!(
+                    buf.ends_with(b"]]"),
+                    "CDATA must end with ']]':\n{:?}",
+                    crate::utils::Bytes(buf)
+                );
                 Ok(Event::CData(BytesCData::wrap(
                     // Cut of `![CDATA[` and `]]` from start and end
                     &buf[8..len - 2],
@@ -176,10 +184,10 @@ impl ReaderState {
     ///
     /// `buf` contains data between `<` and `>`, for example `/tag`.
     pub fn emit_end<'b>(&mut self, buf: &'b [u8]) -> Result<Event<'b>> {
-        debug_assert_eq!(
-            buf.first(),
-            Some(&b'/'),
-            "closing tag should start from '/'"
+        debug_assert!(
+            buf.starts_with(b"/"),
+            "end tag must start from '/':\n{:?}",
+            crate::utils::Bytes(buf)
         );
 
         // Strip the `/` character. `content` contains data between `</` and `>`
@@ -240,13 +248,21 @@ impl ReaderState {
     ///
     /// Returns `Decl` or `PI` event
     pub fn emit_question_mark<'b>(&mut self, buf: &'b [u8]) -> Result<Event<'b>> {
-        debug_assert!(!buf.is_empty());
-        debug_assert_eq!(buf[0], b'?');
+        debug_assert!(
+            buf.starts_with(b"?"),
+            "processing instruction or XML declaration must start from '?':\n{:?}",
+            crate::utils::Bytes(buf)
+        );
+        debug_assert!(
+            buf.ends_with(b"?"),
+            "processing instruction or XML declaration must end with '?':\n{:?}",
+            crate::utils::Bytes(buf)
+        );
 
         let len = buf.len();
         // We accept at least <??>
         //                     ~~ - len = 2
-        if len > 1 && buf[len - 1] == b'?' {
+        if len > 1 {
             // Cut of `?` and `?` from start and end
             let content = &buf[1..len - 1];
             let len = content.len();

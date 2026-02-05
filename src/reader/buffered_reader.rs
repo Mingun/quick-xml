@@ -137,10 +137,10 @@ macro_rules! impl_buffered_source {
                 // should explicitly skip it at first iteration lest we confuse
                 // it with the end
                 if read == 0 {
-                    debug_assert_eq!(
-                        available.first(),
-                        Some(&b'&'),
-                        "`read_ref` must be called at `&`"
+                    debug_assert!(
+                        available.starts_with(b"&"),
+                        "`read_ref` must be called at `&`:\n{:?}",
+                        crate::utils::Bytes(available)
                     );
                     // If that ampersand is lone, then it will be part of text
                     // and we should keep it

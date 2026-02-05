@@ -296,10 +296,10 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
 
     #[inline]
     fn read_ref(&mut self, _buf: (), position: &mut u64) -> ReadRefResult<'a> {
-        debug_assert_eq!(
-            self.first(),
-            Some(&b'&'),
-            "`read_ref` must be called at `&`"
+        debug_assert!(
+            self.starts_with(b"&"),
+            "`read_ref` must be called at `&`:\n{:?}",
+            crate::utils::Bytes(self)
         );
         // Search for the end of reference or a start of another reference or a markup
         match memchr::memchr3(b';', b'&', b'<', &self[1..]) {
@@ -357,7 +357,11 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
     fn read_bang_element(&mut self, _buf: (), position: &mut u64) -> Result<(BangType, &'a [u8])> {
         // Peeked one bang ('!') before being called, so it's guaranteed to
         // start with it.
-        debug_assert_eq!(self[0], b'!');
+        debug_assert!(
+            self.starts_with(b"!"),
+            "`read_bang_element` must be called at `!`:\n{:?}",
+            crate::utils::Bytes(self)
+        );
 
         let mut bang_type = BangType::new(self[1..].first().copied())?;
 
