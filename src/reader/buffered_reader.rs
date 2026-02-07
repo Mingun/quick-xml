@@ -268,8 +268,8 @@ macro_rules! impl_buffered_source {
                 // We only parse from start because we don't want to consider
                 // whatever is in the buffer before the bang element
                 if let Some(i) = bang_type.feed(&buf[start..], available) {
-                    let consumed = i + 1; // +1 for `>` which we do not include
-                    buf.extend_from_slice(&available[..i]);
+                    let consumed = i + 1; // +1 for `>`
+                    buf.extend_from_slice(&available[..consumed]);
 
                     self $(.$reader)? .consume(consumed);
                     read += consumed as u64;

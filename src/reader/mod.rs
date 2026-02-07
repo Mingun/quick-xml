@@ -1306,7 +1306,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::CData, Bytes(b"<![CDATA[]]"))
+                            (BangType::CData, Bytes(b"<![CDATA[]]>"))
                         );
                         assert_eq!(position, 12);
                     }
@@ -1327,7 +1327,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::CData, Bytes(b"<![CDATA[cdata]] ]>content]]"))
+                            (BangType::CData, Bytes(b"<![CDATA[cdata]] ]>content]]>"))
                         );
                         assert_eq!(position, 29);
                     }
@@ -1452,7 +1452,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::Comment, Bytes(b"<!----"))
+                            (BangType::Comment, Bytes(b"<!---->"))
                         );
                         assert_eq!(position, 7);
                     }
@@ -1470,7 +1470,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::Comment, Bytes(b"<!--->comment<---"))
+                            (BangType::Comment, Bytes(b"<!--->comment<--->"))
                         );
                         assert_eq!(position, 18);
                     }
@@ -1531,7 +1531,7 @@ mod test {
                                 .unwrap();
                             assert_eq!(
                                 (ty, Bytes(bytes)),
-                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!DOCTYPE"))
+                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!DOCTYPE>"))
                             );
                             assert_eq!(position, 10);
                         }
@@ -1605,7 +1605,7 @@ mod test {
                                 .unwrap();
                             assert_eq!(
                                 (ty, Bytes(bytes)),
-                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!doctype"))
+                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!doctype>"))
                             );
                             assert_eq!(position, 10);
                         }

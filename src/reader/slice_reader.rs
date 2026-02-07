@@ -362,10 +362,10 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         let mut bang_type = BangType::new(self.get(2).copied())?;
 
         if let Some(i) = bang_type.feed(&[], self) {
-            let consumed = i + 1; // +1 for `>` which we do not include
+            let consumed = i + 1; // +1 for `>`
             *position += consumed as u64;
-            let bytes = &self[..i];
-            *self = &self[consumed..];
+            let (bytes, rest) = self.split_at(consumed);
+            *self = rest;
             return Ok((bang_type, bytes));
         }
 
