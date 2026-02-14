@@ -5,7 +5,7 @@
 
 use crate::events::attributes::Attribute;
 use crate::events::{BytesStart, Event};
-use crate::utils::write_byte_string;
+use crate::utils::{write_byte_string, Bytes};
 use memchr::memchr;
 use std::fmt::{self, Debug, Formatter};
 use std::iter::FusedIterator;
@@ -480,7 +480,7 @@ impl NamespaceBinding {
 /// prefixes into namespaces.
 ///
 /// Holds all internal logic to push/pop namespaces with their levels.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct NamespaceResolver {
     /// Buffer that contains names of namespace prefixes (the part between `xmlns:`
     /// and an `=`) and namespace values.
@@ -490,6 +490,16 @@ pub struct NamespaceResolver {
     /// The number of open tags at the moment. We need to keep track of this to know which namespace
     /// declarations to remove when we encounter an `End` event.
     nesting_level: u16,
+}
+
+impl Debug for NamespaceResolver {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NamespaceResolver")
+            .field("buffer", &Bytes(&self.buffer))
+            .field("bindings", &self.bindings)
+            .field("nesting_level", &self.nesting_level)
+            .finish()
+    }
 }
 
 /// That constant define the one of [reserved namespaces] for the xml standard.
