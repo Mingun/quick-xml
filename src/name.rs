@@ -684,11 +684,54 @@ impl NamespaceResolver {
     /// last call to [`Self::push()`] and [`Self::add()`].
     ///
     /// [namespace bindings]: https://www.w3.org/TR/xml-names11/#dt-NSDecl
+    #[inline]
     pub fn pop(&mut self) {
-        self.nesting_level = self.nesting_level.saturating_sub(1);
-        let current_level = self.nesting_level;
+        self.set_level(self.nesting_level.saturating_sub(1));
+    }
+
+    /// Sets new number of [`push`] calls that were not followed by [`pop`] calls.
+    ///
+    /// When set to value lesser than current [`level`], behaves as if [`pop`]
+    /// will be called until the level reaches the corresponding value.
+    ///
+    /// When set to value bigger than current [`level`] just increases internal
+    /// counter. You may need to call [`pop`] more times that required before.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use pretty_assertions::assert_eq;
+    /// # use quick_xml::events::BytesStart;
+    /// # use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, QName, ResolveResult};
+    /// #
+    /// let mut resolver = NamespaceResolver::default();
+    ///
+    /// assert_eq!(resolver.level(), 0);
+    ///
+    /// resolver.push(&BytesStart::new("tag"));
+    /// assert_eq!(resolver.level(), 1);
+    ///
+    /// resolver.set_level(10);
+    /// assert_eq!(resolver.level(), 10);
+    ///
+    /// resolver.pop();
+    /// assert_eq!(resolver.level(), 9);
+    ///
+    /// resolver.set_level(0);
+    /// assert_eq!(resolver.level(), 0);
+    ///
+    /// // pop from empty resolver does nothing
+    /// resolver.pop();
+    /// assert_eq!(resolver.level(), 0);
+    /// ```
+    ///
+    /// [`push`]: Self::push
+    /// [`pop`]: Self::pop
+    /// [`level`]: Self::level
+    pub fn set_level(&mut self, level: u16) {
+        self.nesting_level = level;
         // from the back (most deeply nested scope), look for the first scope that is still valid
-        match self.bindings.iter().rposition(|n| n.level <= current_level) {
+        match self.bindings.iter().rposition(|n| n.level <= level) {
             // none of the namespaces are valid, remove all of them
             None => {
                 self.buffer.clear();

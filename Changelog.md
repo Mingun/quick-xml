@@ -16,6 +16,8 @@
 
 ### New Features
 
+- [#598]: Add method `NamespaceResolver::set_level` which may be helpful in som circumstances.
+
 ### Bug Fixes
 
 - [#597]: Fix incorrect processing of namespace scopes in `NsReader::read_to_end`
@@ -26,6 +28,7 @@
 ### Misc Changes
 
 [#597]: https://github.com/tafia/quick-xml/issues/597
+[#598]: https://github.com/tafia/quick-xml/pull/598
 [#936]: https://github.com/tafia/quick-xml/pull/936
 
 
