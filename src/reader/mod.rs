@@ -1258,9 +1258,9 @@ mod test {
                     #[ignore = "start CDATA sequence fully checked outside of `read_bang_element`"]
                     $($async)? fn not_properly_start() {
                         let buf = $buf;
-                        let mut position = 1;
+                        let mut position = 0;
                         let mut input = b"<![]]>other content".as_ref();
-                        //                ^= 1
+                        //                ^= 0
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedCData),
@@ -1809,12 +1809,14 @@ mod test {
                 use pretty_assertions::assert_eq;
 
                 /// Checks that nothing was read from empty buffer
+                /// `<` read in peek_one that is called before read_with, that is why it in the input buffer
+                /// peek_one, however, does not increment position for simplicity of the code
                 #[$test]
                 $($async)? fn empty() {
                     let buf = $buf;
-                    let mut position = 1;
-                    let mut input = b"".as_ref();
-                    //                ^= 1
+                    let mut position = 0;
+                    let mut input = b"<".as_ref();
+                    //                 ^= 1
 
                     match $source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? {
                         Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedTag),
@@ -1833,13 +1835,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_tag() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b">".as_ref();
-                        //                 ^= 2
+                        let mut position = 0;
+                        let mut input = b"<>".as_ref();
+                        //                  ^= 2
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"")
+                            Bytes(b"<")
                         );
                         assert_eq!(position, 2);
                     }
@@ -1847,13 +1849,13 @@ mod test {
                     #[$test]
                     $($async)? fn normal() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"tag>".as_ref();
-                        //                    ^= 5
+                        let mut position = 0;
+                        let mut input = b"<tag>".as_ref();
+                        //                     ^= 5
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"tag")
+                            Bytes(b"<tag")
                         );
                         assert_eq!(position, 5);
                     }
@@ -1861,13 +1863,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_ns_empty_tag() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b":>".as_ref();
-                        //                  ^= 3
+                        let mut position = 0;
+                        let mut input = b"<:>".as_ref();
+                        //                   ^= 3
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b":")
+                            Bytes(b"<:")
                         );
                         assert_eq!(position, 3);
                     }
@@ -1875,13 +1877,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_ns() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b":tag>".as_ref();
-                        //                     ^= 6
+                        let mut position = 0;
+                        let mut input = b"<:tag>".as_ref();
+                        //                      ^= 6
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b":tag")
+                            Bytes(b"<:tag")
                         );
                         assert_eq!(position, 6);
                     }
@@ -1889,13 +1891,13 @@ mod test {
                     #[$test]
                     $($async)? fn with_attributes() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = br#"tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref();
-                        //                                                        ^= 39
+                        let mut position = 0;
+                        let mut input = br#"<tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref();
+                        //                                                         ^= 39
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"tag  attr-1=">"  attr2  =  '>'  3attr"#)
+                            Bytes(br#"<tag  attr-1=">"  attr2  =  '>'  3attr"#)
                         );
                         assert_eq!(position, 39);
                     }
@@ -1908,13 +1910,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_tag() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"/>".as_ref();
-                        //                  ^= 3
+                        let mut position = 0;
+                        let mut input = b"</>".as_ref();
+                        //                   ^= 3
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"/")
+                            Bytes(b"</")
                         );
                         assert_eq!(position, 3);
                     }
@@ -1922,13 +1924,13 @@ mod test {
                     #[$test]
                     $($async)? fn normal() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"tag/>".as_ref();
-                        //                     ^= 6
+                        let mut position = 0;
+                        let mut input = b"<tag/>".as_ref();
+                        //                      ^= 6
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"tag/")
+                            Bytes(b"<tag/")
                         );
                         assert_eq!(position, 6);
                     }
@@ -1936,13 +1938,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_ns_empty_tag() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b":/>".as_ref();
-                        //                   ^= 4
+                        let mut position = 0;
+                        let mut input = b"<:/>".as_ref();
+                        //                    ^= 4
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b":/")
+                            Bytes(b"<:/")
                         );
                         assert_eq!(position, 4);
                     }
@@ -1950,13 +1952,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_ns() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b":tag/>".as_ref();
-                        //                      ^= 7
+                        let mut position = 0;
+                        let mut input = b"<:tag/>".as_ref();
+                        //                       ^= 7
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b":tag/")
+                            Bytes(b"<:tag/")
                         );
                         assert_eq!(position, 7);
                     }
@@ -1964,13 +1966,13 @@ mod test {
                     #[$test]
                     $($async)? fn with_attributes() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = br#"tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#.as_ref();
-                        //                                                           ^= 42
+                        let mut position = 0;
+                        let mut input = br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#.as_ref();
+                        //                                                            ^= 42
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"tag  attr-1="/>"  attr2  =  '/>'  3attr/"#)
+                            Bytes(br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/"#)
                         );
                         assert_eq!(position, 42);
                     }
@@ -1983,13 +1985,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_tag() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"/ >".as_ref();
-                        //                   ^= 4
+                        let mut position = 0;
+                        let mut input = b"</ >".as_ref();
+                        //                    ^= 4
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"/ ")
+                            Bytes(b"</ ")
                         );
                         assert_eq!(position, 4);
                     }
@@ -1997,13 +1999,13 @@ mod test {
                     #[$test]
                     $($async)? fn normal() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"/tag>".as_ref();
-                        //                     ^= 6
+                        let mut position = 0;
+                        let mut input = b"</tag>".as_ref();
+                        //                      ^= 6
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"/tag")
+                            Bytes(b"</tag")
                         );
                         assert_eq!(position, 6);
                     }
@@ -2011,13 +2013,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_ns_empty_tag() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"/:>".as_ref();
-                        //                   ^= 4
+                        let mut position = 0;
+                        let mut input = b"</:>".as_ref();
+                        //                    ^= 4
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"/:")
+                            Bytes(b"</:")
                         );
                         assert_eq!(position, 4);
                     }
@@ -2025,13 +2027,13 @@ mod test {
                     #[$test]
                     $($async)? fn empty_ns() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"/:tag>".as_ref();
-                        //                      ^= 7
+                        let mut position = 0;
+                        let mut input = b"</:tag>".as_ref();
+                        //                       ^= 7
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"/:tag")
+                            Bytes(b"</:tag")
                         );
                         assert_eq!(position, 7);
                     }
@@ -2039,13 +2041,13 @@ mod test {
                     #[$test]
                     $($async)? fn with_attributes() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = br#"/tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref();
-                        //                                                         ^= 40
+                        let mut position = 0;
+                        let mut input = br#"</tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref();
+                        //                                                          ^= 40
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"/tag  attr-1=">"  attr2  =  '>'  3attr"#)
+                            Bytes(br#"</tag  attr-1=">"  attr2  =  '>'  3attr"#)
                         );
                         assert_eq!(position, 40);
                     }
