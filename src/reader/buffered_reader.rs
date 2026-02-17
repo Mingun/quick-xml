@@ -512,6 +512,7 @@ mod test {
         read_event_impl,
         read_until_close,
         identity,
+        0,
         &mut Vec::new()
     );
 }

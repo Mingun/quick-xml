@@ -1237,6 +1237,7 @@ mod test {
             $read_until_close:ident,
             // constructor of the XML source on which internal functions will be called
             $source:path,
+            $skip:literal,
             // constructor of the buffer to which read data will stored
             $buf:expr
             $(, $async:ident, $await:ident)?
@@ -1259,8 +1260,8 @@ mod test {
                     $($async)? fn not_properly_start() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<![]]>other content".as_ref();
-                        //                ^= 0
+                        let mut input = &b"<![]]>other content"[$skip..];
+                        //                 ^= 0
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedCData),
@@ -1278,8 +1279,8 @@ mod test {
                     $($async)? fn not_closed() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<![CDATA[other content".as_ref();
-                        //                ^= 0                  ^= 22
+                        let mut input = &b"<![CDATA[other content"[$skip..];
+                        //                 ^= 0                  ^= 22
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedCData),
@@ -1296,7 +1297,7 @@ mod test {
                     $($async)? fn empty() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<![CDATA[]]>other content".as_ref();
+                        let mut input = &b"<![CDATA[]]>other content"[$skip..];
                         //                ^= 0        ^= 12
 
                         let (ty, bytes) = $source(&mut input)
@@ -1317,8 +1318,8 @@ mod test {
                     $($async)? fn with_content() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<![CDATA[cdata]] ]>content]]>other content]]>".as_ref();
-                        //                ^= 0                         ^= 29
+                        let mut input = &b"<![CDATA[cdata]] ]>content]]>other content]]>"[$skip..];
+                        //                 ^= 0                         ^= 29
 
                         let (ty, bytes) = $source(&mut input)
                             .read_bang_element(buf, &mut position)
@@ -1356,9 +1357,9 @@ mod test {
                     #[ignore = "start comment sequence fully checked outside of `read_bang_element`"]
                     $($async)? fn not_properly_start() {
                         let buf = $buf;
-                        let mut position = 1;
-                        let mut input = b"<!- -->other content".as_ref();
-                        //                ^= 1
+                        let mut position = 0;
+                        let mut input = &b"<!- -->other content"[$skip..];
+                        //                  ^= 1
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedComment),
@@ -1374,8 +1375,8 @@ mod test {
                     $($async)? fn not_properly_end() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<!->other content".as_ref();
-                        //                ^= 0             ^= 17
+                        let mut input = &b"<!->other content"[$skip..];
+                        //                 ^= 0             ^= 17
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedComment),
@@ -1391,8 +1392,8 @@ mod test {
                     $($async)? fn not_closed1() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<!--other content".as_ref();
-                        //                ^= 0             ^= 17
+                        let mut input = &b"<!--other content"[$skip..];
+                        //                 ^= 0             ^= 17
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedComment),
@@ -1408,8 +1409,8 @@ mod test {
                     $($async)? fn not_closed2() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<!-->other content".as_ref();
-                        //                ^= 0              ^= 18
+                        let mut input = &b"<!-->other content"[$skip..];
+                        //                 ^= 0              ^= 18
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedComment),
@@ -1425,8 +1426,8 @@ mod test {
                     $($async)? fn not_closed3() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<!--->other content".as_ref();
-                        //                ^= 0               ^= 19
+                        let mut input = &b"<!--->other content"[$skip..];
+                        //                 ^= 0               ^= 19
 
                         match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                             Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedComment),
@@ -1442,8 +1443,8 @@ mod test {
                     $($async)? fn empty() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<!---->other content".as_ref();
-                        //                ^= 0   ^= 7
+                        let mut input = &b"<!---->other content"[$skip..];
+                        //                 ^= 0   ^= 7
 
                         let (ty, bytes) = $source(&mut input)
                             .read_bang_element(buf, &mut position)
@@ -1460,8 +1461,8 @@ mod test {
                     $($async)? fn with_content() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<!--->comment<--->other content".as_ref();
-                        //                ^= 0              ^= 18
+                        let mut input = &b"<!--->comment<--->other content"[$skip..];
+                        //                 ^= 0              ^= 18
 
                         let (ty, bytes) = $source(&mut input)
                             .read_bang_element(buf, &mut position)
@@ -1487,8 +1488,8 @@ mod test {
                         $($async)? fn not_properly_start() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!D other content".as_ref();
-                            //                ^= 0             ^= 17
+                            let mut input = &b"<!D other content"[$skip..];
+                            //                 ^= 0             ^= 17
 
                             match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                                 Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedDoctype),
@@ -1504,8 +1505,8 @@ mod test {
                         $($async)? fn without_space() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!DOCTYPEother content".as_ref();
-                            //                ^= 0                  ^= 22
+                            let mut input = &b"<!DOCTYPEother content"[$skip..];
+                            //                 ^= 0                  ^= 22
 
                             match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                                 Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedDoctype),
@@ -1521,8 +1522,8 @@ mod test {
                         $($async)? fn empty() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!DOCTYPE>other content".as_ref();
-                            //                ^= 0      ^= 10
+                            let mut input = &b"<!DOCTYPE>other content"[$skip..];
+                            //                 ^= 0      ^= 10
 
                             let (ty, bytes) = $source(&mut input)
                                 .read_bang_element(buf, &mut position)
@@ -1539,8 +1540,8 @@ mod test {
                         $($async)? fn not_closed() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!DOCTYPE other content".as_ref();
-                            //                ^= 0                   ^23
+                            let mut input = &b"<!DOCTYPE other content"[$skip..];
+                            //                 ^= 0                   ^23
 
                             match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                                 Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedDoctype),
@@ -1561,8 +1562,8 @@ mod test {
                         $($async)? fn not_properly_start() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!d other content".as_ref();
-                            //                ^= 0             ^= 17
+                            let mut input = &b"<!d other content"[$skip..];
+                            //                 ^= 0             ^= 17
 
                             match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                                 Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedDoctype),
@@ -1578,8 +1579,8 @@ mod test {
                         $($async)? fn without_space() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!doctypeother content".as_ref();
-                            //                ^= 0                  ^= 22
+                            let mut input = &b"<!doctypeother content"[$skip..];
+                            //                 ^= 0                  ^= 22
 
                             match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                                 Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedDoctype),
@@ -1595,8 +1596,8 @@ mod test {
                         $($async)? fn empty() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!doctype>other content".as_ref();
-                            //                ^= 0      ^= 10
+                            let mut input = &b"<!doctype>other content"[$skip..];
+                            //                 ^= 0      ^= 10
 
                             let (ty, bytes) = $source(&mut input)
                                 .read_bang_element(buf, &mut position)
@@ -1613,8 +1614,8 @@ mod test {
                         $($async)? fn not_closed() {
                             let buf = $buf;
                             let mut position = 0;
-                            let mut input = b"<!doctype other content".as_ref();
-                            //                ^= 0                   ^= 23
+                            let mut input = &b"<!doctype other content"[$skip..];
+                            //                 ^= 0                   ^= 23
 
                             match $source(&mut input).read_bang_element(buf, &mut position) $(.$await)? {
                                 Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedDoctype),
@@ -1815,8 +1816,8 @@ mod test {
                 $($async)? fn empty() {
                     let buf = $buf;
                     let mut position = 0;
-                    let mut input = b"<".as_ref();
-                    //                 ^= 1
+                    let mut input = &b"<"[$skip..];
+                    //                  ^= 1
 
                     match $source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? {
                         Err(Error::Syntax(cause)) => assert_eq!(cause, SyntaxError::UnclosedTag),
@@ -1836,8 +1837,8 @@ mod test {
                     $($async)? fn empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<>".as_ref();
-                        //                  ^= 2
+                        let mut input = &b"<>"[$skip..];
+                        //                   ^= 2
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1850,8 +1851,8 @@ mod test {
                     $($async)? fn normal() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<tag>".as_ref();
-                        //                     ^= 5
+                        let mut input = &b"<tag>"[$skip..];
+                        //                      ^= 5
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1864,8 +1865,8 @@ mod test {
                     $($async)? fn empty_ns_empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<:>".as_ref();
-                        //                   ^= 3
+                        let mut input = &b"<:>"[$skip..];
+                        //                    ^= 3
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1878,8 +1879,8 @@ mod test {
                     $($async)? fn empty_ns() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<:tag>".as_ref();
-                        //                      ^= 6
+                        let mut input = &b"<:tag>"[$skip..];
+                        //                       ^= 6
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1892,8 +1893,8 @@ mod test {
                     $($async)? fn with_attributes() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = br#"<tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref();
-                        //                                                         ^= 39
+                        let mut input = &br#"<tag  attr-1=">"  attr2  =  '>'  3attr>"#[$skip..];
+                        //                                                          ^= 39
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1911,8 +1912,8 @@ mod test {
                     $($async)? fn empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"</>".as_ref();
-                        //                   ^= 3
+                        let mut input = &b"</>"[$skip..];
+                        //                    ^= 3
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1925,8 +1926,8 @@ mod test {
                     $($async)? fn normal() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<tag/>".as_ref();
-                        //                      ^= 6
+                        let mut input = &b"<tag/>"[$skip..];
+                        //                       ^= 6
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1939,8 +1940,8 @@ mod test {
                     $($async)? fn empty_ns_empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<:/>".as_ref();
-                        //                    ^= 4
+                        let mut input = &b"<:/>"[$skip..];
+                        //                     ^= 4
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1953,8 +1954,8 @@ mod test {
                     $($async)? fn empty_ns() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"<:tag/>".as_ref();
-                        //                       ^= 7
+                        let mut input = &b"<:tag/>"[$skip..];
+                        //                        ^= 7
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1967,8 +1968,8 @@ mod test {
                     $($async)? fn with_attributes() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#.as_ref();
-                        //                                                            ^= 42
+                        let mut input = &br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#[$skip..];
+                        //                                                             ^= 42
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -1986,8 +1987,8 @@ mod test {
                     $($async)? fn empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"</ >".as_ref();
-                        //                    ^= 4
+                        let mut input = &b"</ >"[$skip..];
+                        //                     ^= 4
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -2000,8 +2001,8 @@ mod test {
                     $($async)? fn normal() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"</tag>".as_ref();
-                        //                      ^= 6
+                        let mut input = &b"</tag>"[$skip..];
+                        //                       ^= 6
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -2014,8 +2015,8 @@ mod test {
                     $($async)? fn empty_ns_empty_tag() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"</:>".as_ref();
-                        //                    ^= 4
+                        let mut input = &b"</:>"[$skip..];
+                        //                     ^= 4
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -2028,8 +2029,8 @@ mod test {
                     $($async)? fn empty_ns() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = b"</:tag>".as_ref();
-                        //                       ^= 7
+                        let mut input = &b"</:tag>"[$skip..];
+                        //                        ^= 7
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
@@ -2042,8 +2043,8 @@ mod test {
                     $($async)? fn with_attributes() {
                         let buf = $buf;
                         let mut position = 0;
-                        let mut input = br#"</tag  attr-1=">"  attr2  =  '>'  3attr>"#.as_ref();
-                        //                                                          ^= 40
+                        let mut input = &br#"</tag  attr-1=">"  attr2  =  '>'  3attr>"#[$skip..];
+                        //                                                           ^= 40
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
