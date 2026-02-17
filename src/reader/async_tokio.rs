@@ -425,7 +425,7 @@ mod test {
         read_event_into_async,
         read_until_close_async,
         TokioAdapter,
-        0,
+        1,
         &mut Vec::new(),
         async,
         await
