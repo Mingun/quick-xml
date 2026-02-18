@@ -16,15 +16,21 @@
 
 ### New Features
 
+### Bug Fixes
+
+### Misc Changes
+
+
+## 0.39.2 -- 2026-02-20
+
+### New Features
+
 - [#483]: Implement `read_text_into()` and `read_text_into_async()`.
 
 ### Bug Fixes
 
 - [#939]: Fix parsing error of the tag from buffered reader, when the first byte `<`
   is the last in the `BufRead` internal buffer. This is the regression from [#936].
-
-
-### Misc Changes
 
 [#483]: https://github.com/tafia/quick-xml/issues/483
 [#936]: https://github.com/tafia/quick-xml/pull/936
