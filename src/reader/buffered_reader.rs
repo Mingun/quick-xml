@@ -195,8 +195,10 @@ macro_rules! impl_buffered_source {
             buf: &'b mut Vec<u8>,
             position: &mut u64,
         ) -> Result<&'b [u8]> {
-            let mut read = 0;
+            let mut read = 1;
             let start = buf.len();
+            // '<' was consumed in peek_one(), but not placed in buf
+            buf.push(b'<');
             loop {
                 let available = match self $(.$reader)? .fill_buf() $(.$await)? {
                     Ok(n) if n.is_empty() => break,
@@ -240,9 +242,10 @@ macro_rules! impl_buffered_source {
             // Peeked '<!' before being called, so it's guaranteed to start with it.
             let start = buf.len();
             let mut read = 2;
+            // '<' was consumed in peek_one(), but not placed in buf
             buf.push(b'<');
             buf.push(b'!');
-            self $(.$reader)? .consume(2);
+            self $(.$reader)? .consume(1);
 
             let mut bang_type = loop {
                 break match self $(.$reader)? .fill_buf() $(.$await)? {
@@ -310,6 +313,9 @@ macro_rules! impl_buffered_source {
 
         #[inline]
         $($async)? fn peek_one(&mut self) -> io::Result<Option<u8>> {
+            // That method is called only when available buffer starts from '<'
+            // We need to consume it
+            self $(.$reader)? .consume(1);
             let available = loop {
                 break match self $(.$reader)? .fill_buf() $(.$await)? {
                     Ok(n) => n,
@@ -317,12 +323,7 @@ macro_rules! impl_buffered_source {
                     Err(e) => return Err(e),
                 };
             };
-            debug_assert!(
-                available.starts_with(b"<"),
-                "markup must start from '<':\n{:?}",
-                crate::utils::Bytes(available)
-            );
-            Ok(available.get(1).cloned())
+            Ok(available.first().cloned())
         }
     };
 }
@@ -512,6 +513,7 @@ mod test {
         read_event_impl,
         read_until_close,
         identity,
+        1,
         &mut Vec::new()
     );
 }

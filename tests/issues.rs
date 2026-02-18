@@ -600,3 +600,44 @@ mod issue923 {
         assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
     }
 }
+
+/// Regression test for https://github.com/tafia/quick-xml/issues/939
+///
+/// Checks that reading from a short internal buffer of `BufRead` implementation
+/// does not break the parser. Here `BufReader` splits input into two 4-byte chunks:
+/// - `<r><`
+/// - `/r>`
+///
+/// Passing of this test shows that `<` in the end of the first chunk does not
+/// considered as an incomplete tag and parser correctly consumes this byte and
+/// requests the next chunk.
+#[test]
+fn issue939() {
+    let xml_file = BufReader::with_capacity(4, &b"<r></r>"[..]);
+    let mut reader = Reader::from_reader(xml_file);
+    let mut buf = Vec::new();
+
+    assert_eq!(
+        reader.read_event_into(&mut buf).unwrap(),
+        Event::Start(BytesStart::new("r"))
+    );
+    assert_eq!(
+        quick_xml::utils::Bytes(&buf),
+        quick_xml::utils::Bytes(b"<r")
+    );
+    assert_eq!(
+        quick_xml::utils::Bytes(reader.get_ref().buffer()),
+        quick_xml::utils::Bytes(b"<")
+    );
+
+    assert_eq!(
+        reader.read_event_into(&mut buf).unwrap(),
+        Event::End(BytesEnd::new("r"))
+    );
+    assert_eq!(
+        quick_xml::utils::Bytes(&buf),
+        quick_xml::utils::Bytes(b"<r</r")
+    );
+
+    assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
+}

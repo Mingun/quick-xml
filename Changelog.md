@@ -18,7 +18,14 @@
 
 ### Bug Fixes
 
+- [#939]: Fix parsing error of the tag from buffered reader, when the first byte `<`
+  is the last in the `BufRead` internal buffer. This is the regression from [#936].
+
+
 ### Misc Changes
+
+[#936]: https://github.com/tafia/quick-xml/pull/936
+[#939]: https://github.com/tafia/quick-xml/issues/939
 
 
 ## 0.39.1 -- 2026-02-15
