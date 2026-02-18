@@ -285,7 +285,8 @@ macro_rules! read_event_impl {
                         ReadRefResult::Ref(bytes) => {
                             $self.state.state = ParseState::InsideText;
                             // +1 to skip start `&`
-                            Ok(Event::GeneralRef(BytesRef::wrap(&bytes[1..], $self.decoder())))
+                            // -1 to skip end `;`
+                            Ok(Event::GeneralRef(BytesRef::wrap(&bytes[1..bytes.len() - 1], $self.decoder())))
                         }
                         // Go to Done state
                         ReadRefResult::UpToEof(bytes) if $self.state.config.allow_dangling_amp => {
@@ -1781,7 +1782,7 @@ mod test {
                     //                  ^= 3
 
                     match $source(&mut input).read_ref(buf, &mut position) $(.$await)? {
-                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&")),
+                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&;")),
                         x => panic!("Expected `Ref(_)`, but got `{:?}`", x),
                     }
                     assert_eq!(position, 3);
@@ -1795,7 +1796,7 @@ mod test {
                     //                    ^= 5
 
                     match $source(&mut input).read_ref(buf, &mut position) $(.$await)? {
-                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&lt")),
+                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&lt;")),
                         x => panic!("Expected `Ref(_)`, but got `{:?}`", x),
                     }
                     assert_eq!(position, 5);

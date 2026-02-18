@@ -300,11 +300,12 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         // Search for the end of reference or a start of another reference or a markup
         match memchr::memchr3(b';', b'&', b'<', &self[1..]) {
             Some(i) if self[i + 1] == b';' => {
-                let end = i + 1;
-                let bytes = &self[..end];
-                // +1 -- skip the end `;`
-                *self = &self[end + 1..];
-                *position += end as u64 + 1;
+                // +1 for the start `&`
+                // +1 for the end `;`
+                let end = i + 2;
+                let (bytes, rest) = self.split_at(end);
+                *self = rest;
+                *position += end as u64;
 
                 ReadRefResult::Ref(bytes)
             }

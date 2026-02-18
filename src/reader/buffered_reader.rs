@@ -146,10 +146,10 @@ macro_rules! impl_buffered_source {
 
                 match memchr::memchr3(b';', b'&', b'<', available) {
                     Some(i) if available[i] == b';' => {
-                        buf.extend_from_slice(&available[..i]);
-
                         // +1 -- skip the end `;`
                         let used = i + 1;
+
+                        buf.extend_from_slice(&available[..used]);
                         self $(.$reader)? .consume(used);
                         read += used as u64;
 
