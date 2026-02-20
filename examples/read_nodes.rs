@@ -2,6 +2,7 @@
 // Note: for this specific data set using serde feature would simplify
 //       this simple data is purely to make it easier to understand the code
 
+use quick_xml::encoding::EncodingError;
 use quick_xml::events::attributes::AttrError;
 use quick_xml::events::{BytesStart, Event};
 use quick_xml::name::QName;
@@ -53,6 +54,12 @@ impl From<AttrError> for AppError {
     }
 }
 
+impl From<EncodingError> for AppError {
+    fn from(error: EncodingError) -> Self {
+        Self::Xml(quick_xml::Error::Encoding(error))
+    }
+}
+
 #[derive(Debug)]
 struct Translation {
     tag: String,
@@ -91,7 +98,7 @@ impl Translation {
                 Ok(Translation {
                     tag: tag.into(),
                     lang: lang.into(),
-                    text: text_content.into(),
+                    text: text_content.decode()?.into(),
                 })
             } else {
                 dbg!("Expected Event::Start for Text, got: {:?}", &event);

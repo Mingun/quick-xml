@@ -349,7 +349,10 @@ mod read_text {
         r.config_mut().trim_text(true);
 
         assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
-        assert_eq!(r.read_text(QName(b"tag")).unwrap(), " text ");
+        assert_eq!(
+            r.read_text(QName(b"tag")).unwrap(),
+            BytesText::from_escaped(" text ")
+        );
         assert_eq!(r.read_event().unwrap(), Eof);
     }
 
@@ -359,7 +362,10 @@ mod read_text {
         r.config_mut().trim_text(true);
 
         assert_eq!(r.read_event().unwrap(), Start(BytesStart::new("tag")));
-        assert_eq!(r.read_text(QName(b"tag")).unwrap(), " <nested/> ");
+        assert_eq!(
+            r.read_text(QName(b"tag")).unwrap(),
+            BytesText::from_escaped(" <nested/> ")
+        );
         assert_eq!(r.read_event().unwrap(), Eof);
     }
 }
