@@ -1968,3 +1968,80 @@ mod xml_prolog {
         );
     }
 }
+
+/// Tests for https://github.com/tafia/quick-xml/pull/937.
+///
+/// Checks that correct EOL normalization rules is applied to the texts.
+mod xml_version {
+    use super::*;
+    use pretty_assertions::assert_eq;
+    use quick_xml::errors::{Error, IllFormedError};
+
+    #[derive(Debug, Deserialize, PartialEq)]
+    struct Root {
+        #[serde(rename = "$text")]
+        text: String,
+    }
+
+    #[test]
+    fn v1_0_implicit() {
+        assert_eq!(
+            from_str::<Root>(
+                "\
+                <root>\r\n,\n,\r,\r\u{0085},\u{0085},\u{2028}</root>\
+                "
+            )
+            .unwrap(),
+            Root {
+                text: "\n,\n,\n,\n\u{0085},\u{0085},\u{2028}".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn v1_0_explicit() {
+        assert_eq!(
+            from_str::<Root>(
+                "\
+                <?xml version='1.0'?>\
+                <root>\r\n,\n,\r,\r\u{0085},\u{0085},\u{2028}</root>\
+                "
+            )
+            .unwrap(),
+            Root {
+                text: "\n,\n,\n,\n\u{0085},\u{0085},\u{2028}".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn v1_1() {
+        assert_eq!(
+            from_str::<Root>(
+                "\
+                <?xml version='1.1'?>\
+                <root>\r\n,\n,\r,\r\u{0085},\u{0085},\u{2028}</root>\
+                "
+            )
+            .unwrap(),
+            Root {
+                text: "\n,\n,\n,\n,\n,\n".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn unknown() {
+        match from_str::<Root>(
+            "\
+                <?xml version='1.2'?>\
+                <root>\r\n,\n,\r,\r\u{0085},\u{0085},\u{2028}</root>\
+                ",
+        ) {
+            Err(DeError::InvalidXml(Error::IllFormed(cause))) => {
+                assert_eq!(cause, IllFormedError::UnknownVersion,)
+            }
+            x => panic!("Expected `Err(InvalidXml(IllFormed(_)))`, but got {:?}", x),
+        }
+    }
+}

@@ -78,3 +78,22 @@ pub use crate::errors::serialize::{DeError, SeError};
 pub use crate::errors::{Error, Result};
 pub use crate::reader::{NsReader, Reader};
 pub use crate::writer::{ElementWriter, Writer};
+
+/// Version of XML standard
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum XmlVersion {
+    /// [Version 1.0], which is the default version of XML document if XML declaration
+    /// is missed. Most documents in the world are still XML 1.0 documents.
+    ///
+    /// [Version 1.0]: https://www.w3.org/TR/xml/
+    V1_0,
+    /// [Version 1.1](https://www.w3.org/TR/xml11/)
+    V1_1,
+}
+
+impl Default for XmlVersion {
+    #[inline]
+    fn default() -> Self {
+        Self::V1_0
+    }
+}

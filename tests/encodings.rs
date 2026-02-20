@@ -37,7 +37,7 @@ fn test_koi8_r_encoding() {
     loop {
         match r.read_event_into(&mut buf) {
             Ok(Text(e)) => {
-                e.xml_content().unwrap();
+                e.xml10_content().unwrap();
             }
             Ok(Eof) => break,
             _ => (),

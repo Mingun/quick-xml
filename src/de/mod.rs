@@ -2107,6 +2107,7 @@ pub use self::attributes::AttributesDeserializer;
 pub use self::resolver::{EntityResolver, PredefinedEntityResolver};
 pub use self::simple_type::SimpleTypeDeserializer;
 pub use crate::errors::serialize::DeError;
+use crate::XmlVersion;
 
 use crate::{
     de::map::ElementMapAccess,
@@ -2391,8 +2392,12 @@ impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
             }
 
             match self.next_impl()? {
-                PayloadEvent::Text(e) => result.to_mut().push_str(&e.xml_content()?),
-                PayloadEvent::CData(e) => result.to_mut().push_str(&e.xml_content()?),
+                PayloadEvent::Text(e) => result
+                    .to_mut()
+                    .push_str(&e.xml_content(self.reader.xml_version())?),
+                PayloadEvent::CData(e) => result
+                    .to_mut()
+                    .push_str(&e.xml_content(self.reader.xml_version())?),
                 PayloadEvent::GeneralRef(e) => self.resolve_reference(result.to_mut(), e)?,
 
                 // SAFETY: current_event_is_last_text checks that event is Text, CData or GeneralRef
@@ -2408,8 +2413,10 @@ impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
             return match self.next_impl()? {
                 PayloadEvent::Start(e) => Ok(DeEvent::Start(e)),
                 PayloadEvent::End(e) => Ok(DeEvent::End(e)),
-                PayloadEvent::Text(e) => self.drain_text(e.xml_content()?),
-                PayloadEvent::CData(e) => self.drain_text(e.xml_content()?),
+                PayloadEvent::Text(e) => self.drain_text(e.xml_content(self.reader.xml_version())?),
+                PayloadEvent::CData(e) => {
+                    self.drain_text(e.xml_content(self.reader.xml_version())?)
+                }
                 PayloadEvent::DocType(e) => {
                     self.entity_resolver
                         .capture(e)
@@ -3068,7 +3075,13 @@ where
         let config = reader.config_mut();
         config.expand_empty_elements = true;
 
-        Self::new(SliceReader { reader }, entity_resolver)
+        Self::new(
+            SliceReader {
+                reader,
+                version: XmlVersion::V1_0,
+            },
+            entity_resolver,
+        )
     }
 }
 
@@ -3148,6 +3161,7 @@ where
             IoReader {
                 reader,
                 buf: Vec::new(),
+                version: XmlVersion::V1_0,
             },
             entity_resolver,
         )
@@ -3167,6 +3181,7 @@ where
             IoReader {
                 reader,
                 buf: Vec::new(),
+                version: XmlVersion::V1_0,
             },
             entity_resolver,
         )
@@ -3391,6 +3406,9 @@ pub trait XmlRead<'i> {
     /// when it cannot satisfy the lifetime.
     fn read_to_end(&mut self, name: QName) -> Result<(), DeError>;
 
+    /// Return an XML version of the source.
+    fn xml_version(&self) -> XmlVersion;
+
     /// A copy of the reader's decoder used to decode strings.
     fn decoder(&self) -> Decoder;
 
@@ -3408,6 +3426,7 @@ pub trait XmlRead<'i> {
 pub struct IoReader<R: BufRead> {
     reader: NsReader<R>,
     buf: Vec<u8>,
+    version: XmlVersion,
 }
 
 impl<R: BufRead> IoReader<R> {
@@ -3451,6 +3470,9 @@ impl<'i, R: BufRead> XmlRead<'i> for IoReader<R> {
             self.buf.clear();
 
             let event = self.reader.read_event_into(&mut self.buf)?;
+            if let Event::Decl(e) = &event {
+                self.version = e.xml_version()?;
+            }
             if let Some(event) = skip_uninterested(event) {
                 return Ok(event.into_owned());
             }
@@ -3464,6 +3486,12 @@ impl<'i, R: BufRead> XmlRead<'i> for IoReader<R> {
         }
     }
 
+    #[inline]
+    fn xml_version(&self) -> XmlVersion {
+        self.version
+    }
+
+    #[inline]
     fn decoder(&self) -> Decoder {
         self.reader.decoder()
     }
@@ -3479,6 +3507,7 @@ impl<'i, R: BufRead> XmlRead<'i> for IoReader<R> {
 /// [`Deserializer::from_str`].
 pub struct SliceReader<'de> {
     reader: NsReader<&'de [u8]>,
+    version: XmlVersion,
 }
 
 impl<'de> SliceReader<'de> {
@@ -3519,6 +3548,9 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
     fn next(&mut self) -> Result<PayloadEvent<'de>, DeError> {
         loop {
             let event = self.reader.read_event()?;
+            if let Event::Decl(e) = &event {
+                self.version = e.xml_version()?;
+            }
             if let Some(event) = skip_uninterested(event) {
                 return Ok(event);
             }
@@ -3532,6 +3564,12 @@ impl<'de> XmlRead<'de> for SliceReader<'de> {
         }
     }
 
+    #[inline]
+    fn xml_version(&self) -> XmlVersion {
+        self.version
+    }
+
+    #[inline]
     fn decoder(&self) -> Decoder {
         self.reader.decoder()
     }
@@ -4123,9 +4161,11 @@ mod tests {
         let mut reader1 = IoReader {
             reader: NsReader::from_reader(s.as_bytes()),
             buf: Vec::new(),
+            version: XmlVersion::V1_0,
         };
         let mut reader2 = SliceReader {
             reader: NsReader::from_str(s),
+            version: XmlVersion::V1_0,
         };
 
         loop {
@@ -4151,6 +4191,7 @@ mod tests {
 
         let mut reader = SliceReader {
             reader: NsReader::from_str(s),
+            version: XmlVersion::V1_0,
         };
 
         let config = reader.reader.config_mut();

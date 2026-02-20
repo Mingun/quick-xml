@@ -38,7 +38,7 @@ fn fuzz_101() {
                 }
             }
             Ok(Event::Text(e)) => {
-                if e.xml_content().is_err() {
+                if e.xml10_content().is_err() {
                     break;
                 }
             }

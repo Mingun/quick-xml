@@ -16,9 +16,20 @@
 
 ### New Features
 
+- [#938]: Add new enumeration `XmlVersion` and typified getter `BytesDecl::xml_version()`.
+- [#938]: Add new error variant `IllFormedError::UnknownVersion`.
+
 ### Bug Fixes
 
+- [#938]: Use correct rules for EOL normalization in `Deserializer` when parse XML 1.0 documents.
+  Previously XML 1.1. rules was applied.
+
 ### Misc Changes
+
+- [#938]: Now `BytesText::xml_content`, `BytesCData::xml_content` and `BytesRef::xml_content`
+  accepts `XmlVersion` parameter to apply correct EOL normalization rules.
+
+[#938]: https://github.com/tafia/quick-xml/pull/938
 
 
 ## 0.39.2 -- 2026-02-20
@@ -41,7 +52,7 @@
 
 ### New Features
 
-- [#598]: Add method `NamespaceResolver::set_level` which may be helpful in som circumstances.
+- [#598]: Add method `NamespaceResolver::set_level` which may be helpful in some circumstances.
 
 ### Bug Fixes
 

@@ -54,6 +54,7 @@ use crate::escape::{
 };
 use crate::name::{LocalName, QName};
 use crate::utils::{self, name_len, trim_xml_end, trim_xml_start, write_cow_string};
+use crate::XmlVersion;
 use attributes::{AttrError, Attribute, Attributes};
 
 /// Opening tag data (`Event::Start`), with optional attributes: `<name attr="value">`.
@@ -659,8 +660,11 @@ impl<'a> BytesText<'a> {
 
     /// Alias for [`xml11_content()`](Self::xml11_content).
     #[inline]
-    pub fn xml_content(&self) -> Result<Cow<'a, str>, EncodingError> {
-        self.xml11_content()
+    pub fn xml_content(&self, version: XmlVersion) -> Result<Cow<'a, str>, EncodingError> {
+        match version {
+            XmlVersion::V1_0 => self.xml10_content(),
+            XmlVersion::V1_1 => self.xml11_content(),
+        }
     }
 
     /// Alias for [`xml10_content()`](Self::xml10_content).
@@ -967,8 +971,11 @@ impl<'a> BytesCData<'a> {
 
     /// Alias for [`xml11_content()`](Self::xml11_content).
     #[inline]
-    pub fn xml_content(&self) -> Result<Cow<'a, str>, EncodingError> {
-        self.xml11_content()
+    pub fn xml_content(&self, version: XmlVersion) -> Result<Cow<'a, str>, EncodingError> {
+        match version {
+            XmlVersion::V1_0 => self.xml10_content(),
+            XmlVersion::V1_1 => self.xml11_content(),
+        }
     }
 
     /// Alias for [`xml10_content()`](Self::xml10_content).
@@ -1432,6 +1439,71 @@ impl<'a> BytesDecl<'a> {
             .transpose()
     }
 
+    /// Gets XML version as typified enumeration.
+    ///
+    /// According to the [grammar], the version *must* be the first thing in the declaration.
+    /// This method tries to extract the first thing in the declaration and return it.
+    /// In case of multiple attributes value of the first one is returned.
+    ///
+    /// If version is missed in the declaration, or the first thing is not a version,
+    /// [`IllFormedError::MissingDeclVersion`] will be returned.
+    ///
+    /// If version is not 1.0 or 1.1, [`IllFormedError::UnknownVersion`] will be returned.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use quick_xml::XmlVersion;
+    /// use quick_xml::errors::{Error, IllFormedError};
+    /// use quick_xml::events::{BytesDecl, BytesStart};
+    ///
+    /// // <?xml version='1.1'?>
+    /// let decl = BytesDecl::from_start(BytesStart::from_content(" version='1.1'", 0));
+    /// assert_eq!(decl.xml_version().unwrap(), XmlVersion::V1_1);
+    ///
+    /// // <?xml version='1.0' version='1.1'?>
+    /// let decl = BytesDecl::from_start(BytesStart::from_content(" version='1.0' version='1.1'", 0));
+    /// assert_eq!(decl.xml_version().unwrap(), XmlVersion::V1_0);
+    ///
+    /// // <?xml version='1.2'?>
+    /// let decl = BytesDecl::from_start(BytesStart::from_content(" version='1.2'", 0));
+    /// match decl.xml_version() {
+    ///     Err(Error::IllFormed(IllFormedError::UnknownVersion)) => {},
+    ///     _ => assert!(false),
+    /// }
+    ///
+    /// // <?xml encoding='utf-8'?>
+    /// let decl = BytesDecl::from_start(BytesStart::from_content(" encoding='utf-8'", 0));
+    /// match decl.xml_version() {
+    ///     Err(Error::IllFormed(IllFormedError::MissingDeclVersion(Some(key)))) => assert_eq!(key, "encoding"),
+    ///     _ => assert!(false),
+    /// }
+    ///
+    /// // <?xml encoding='utf-8' version='1.1'?>
+    /// let decl = BytesDecl::from_start(BytesStart::from_content(" encoding='utf-8' version='1.1'", 0));
+    /// match decl.xml_version() {
+    ///     Err(Error::IllFormed(IllFormedError::MissingDeclVersion(Some(key)))) => assert_eq!(key, "encoding"),
+    ///     _ => assert!(false),
+    /// }
+    ///
+    /// // <?xml?>
+    /// let decl = BytesDecl::from_start(BytesStart::from_content("", 0));
+    /// match decl.xml_version() {
+    ///     Err(Error::IllFormed(IllFormedError::MissingDeclVersion(None))) => {},
+    ///     _ => assert!(false),
+    /// }
+    /// ```
+    ///
+    /// [grammar]: https://www.w3.org/TR/xml11/#NT-XMLDecl
+    pub fn xml_version(&self) -> Result<XmlVersion, Error> {
+        let v = self.version()?;
+        match v.as_ref() {
+            b"1.0" => Ok(XmlVersion::V1_0),
+            b"1.1" => Ok(XmlVersion::V1_1),
+            _ => Err(Error::IllFormed(IllFormedError::UnknownVersion)),
+        }
+    }
+
     /// Gets the actual encoding using [_get an encoding_](https://encoding.spec.whatwg.org/#concept-encoding-get)
     /// algorithm.
     ///
@@ -1614,8 +1686,11 @@ impl<'a> BytesRef<'a> {
 
     /// Alias for [`xml11_content()`](Self::xml11_content).
     #[inline]
-    pub fn xml_content(&self) -> Result<Cow<'a, str>, EncodingError> {
-        self.xml11_content()
+    pub fn xml_content(&self, version: XmlVersion) -> Result<Cow<'a, str>, EncodingError> {
+        match version {
+            XmlVersion::V1_0 => self.xml10_content(),
+            XmlVersion::V1_1 => self.xml11_content(),
+        }
     }
 
     /// Alias for [`xml10_content()`](Self::xml10_content).
