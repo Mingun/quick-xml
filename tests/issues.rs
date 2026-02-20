@@ -623,7 +623,7 @@ fn issue939() {
     );
     assert_eq!(
         quick_xml::utils::Bytes(&buf),
-        quick_xml::utils::Bytes(b"<r")
+        quick_xml::utils::Bytes(b"<r>")
     );
     assert_eq!(
         quick_xml::utils::Bytes(reader.get_ref().buffer()),
@@ -636,7 +636,7 @@ fn issue939() {
     );
     assert_eq!(
         quick_xml::utils::Bytes(&buf),
-        quick_xml::utils::Bytes(b"<r</r")
+        quick_xml::utils::Bytes(b"<r></r>")
     );
 
     assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);

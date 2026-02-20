@@ -285,7 +285,8 @@ macro_rules! read_event_impl {
                         ReadRefResult::Ref(bytes) => {
                             $self.state.state = ParseState::InsideText;
                             // +1 to skip start `&`
-                            Ok(Event::GeneralRef(BytesRef::wrap(&bytes[1..], $self.decoder())))
+                            // -1 to skip end `;`
+                            Ok(Event::GeneralRef(BytesRef::wrap(&bytes[1..bytes.len() - 1], $self.decoder())))
                         }
                         // Go to Done state
                         ReadRefResult::UpToEof(bytes) if $self.state.config.allow_dangling_amp => {
@@ -1166,7 +1167,7 @@ impl BangType {
     /// - `buf`: buffer with data consumed on previous iterations
     /// - `chunk`: data read on current iteration and not yet consumed from reader
     #[inline(always)]
-    fn parse<'b>(&mut self, buf: &[u8], chunk: &'b [u8]) -> Option<(&'b [u8], usize)> {
+    fn feed<'b>(&mut self, buf: &[u8], chunk: &'b [u8]) -> Option<usize> {
         match self {
             Self::Comment => {
                 for i in memchr::memchr_iter(b'>', chunk) {
@@ -1179,17 +1180,17 @@ impl BangType {
                             // check_comments enabled option. XML standard requires that comment
                             // will not end with `--->` sequence because this is a special case of
                             // `--` in the comment (https://www.w3.org/TR/xml11/#sec-comments)
-                            return Some((&chunk[..i], i + 1)); // +1 for `>`
+                            return Some(i);
                         }
                         // End sequence `-|->` was splitted at |
                         //        buf --/   \-- chunk
                         if i == 1 && buf.ends_with(b"-") && chunk[0] == b'-' {
-                            return Some((&chunk[..i], i + 1)); // +1 for `>`
+                            return Some(i);
                         }
                         // End sequence `--|>` was splitted at |
                         //         buf --/   \-- chunk
                         if i == 0 && buf.ends_with(b"--") {
-                            return Some((&[], i + 1)); // +1 for `>`
+                            return Some(i);
                         }
                     }
                 }
@@ -1197,17 +1198,17 @@ impl BangType {
             Self::CData => {
                 for i in memchr::memchr_iter(b'>', chunk) {
                     if chunk[..i].ends_with(b"]]") {
-                        return Some((&chunk[..i], i + 1)); // +1 for `>`
+                        return Some(i);
                     }
                     // End sequence `]|]>` was splitted at |
                     //        buf --/   \-- chunk
                     if i == 1 && buf.ends_with(b"]") && chunk[0] == b']' {
-                        return Some((&chunk[..i], i + 1)); // +1 for `>`
+                        return Some(i);
                     }
                     // End sequence `]]|>` was splitted at |
                     //         buf --/   \-- chunk
                     if i == 0 && buf.ends_with(b"]]") {
-                        return Some((&[], i + 1)); // +1 for `>`
+                        return Some(i);
                     }
                 }
             }
@@ -1306,7 +1307,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::CData, Bytes(b"<![CDATA[]]"))
+                            (BangType::CData, Bytes(b"<![CDATA[]]>"))
                         );
                         assert_eq!(position, 12);
                     }
@@ -1327,7 +1328,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::CData, Bytes(b"<![CDATA[cdata]] ]>content]]"))
+                            (BangType::CData, Bytes(b"<![CDATA[cdata]] ]>content]]>"))
                         );
                         assert_eq!(position, 29);
                     }
@@ -1452,7 +1453,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::Comment, Bytes(b"<!----"))
+                            (BangType::Comment, Bytes(b"<!---->"))
                         );
                         assert_eq!(position, 7);
                     }
@@ -1470,7 +1471,7 @@ mod test {
                             .unwrap();
                         assert_eq!(
                             (ty, Bytes(bytes)),
-                            (BangType::Comment, Bytes(b"<!--->comment<---"))
+                            (BangType::Comment, Bytes(b"<!--->comment<--->"))
                         );
                         assert_eq!(position, 18);
                     }
@@ -1531,7 +1532,7 @@ mod test {
                                 .unwrap();
                             assert_eq!(
                                 (ty, Bytes(bytes)),
-                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!DOCTYPE"))
+                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!DOCTYPE>"))
                             );
                             assert_eq!(position, 10);
                         }
@@ -1605,7 +1606,7 @@ mod test {
                                 .unwrap();
                             assert_eq!(
                                 (ty, Bytes(bytes)),
-                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!doctype"))
+                                (BangType::DocType(DtdParser::Finished), Bytes(b"<!doctype>"))
                             );
                             assert_eq!(position, 10);
                         }
@@ -1781,7 +1782,7 @@ mod test {
                     //                  ^= 3
 
                     match $source(&mut input).read_ref(buf, &mut position) $(.$await)? {
-                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&")),
+                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&;")),
                         x => panic!("Expected `Ref(_)`, but got `{:?}`", x),
                     }
                     assert_eq!(position, 3);
@@ -1795,7 +1796,7 @@ mod test {
                     //                    ^= 5
 
                     match $source(&mut input).read_ref(buf, &mut position) $(.$await)? {
-                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&lt")),
+                        ReadRefResult::Ref(bytes) => assert_eq!(Bytes(bytes), Bytes(b"&lt;")),
                         x => panic!("Expected `Ref(_)`, but got `{:?}`", x),
                     }
                     assert_eq!(position, 5);
@@ -1842,7 +1843,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<")
+                            Bytes(b"<>")
                         );
                         assert_eq!(position, 2);
                     }
@@ -1856,7 +1857,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<tag")
+                            Bytes(b"<tag>")
                         );
                         assert_eq!(position, 5);
                     }
@@ -1870,7 +1871,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:")
+                            Bytes(b"<:>")
                         );
                         assert_eq!(position, 3);
                     }
@@ -1884,7 +1885,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:tag")
+                            Bytes(b"<:tag>")
                         );
                         assert_eq!(position, 6);
                     }
@@ -1898,7 +1899,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"<tag  attr-1=">"  attr2  =  '>'  3attr"#)
+                            Bytes(br#"<tag  attr-1=">"  attr2  =  '>'  3attr>"#)
                         );
                         assert_eq!(position, 39);
                     }
@@ -1917,7 +1918,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</")
+                            Bytes(b"</>")
                         );
                         assert_eq!(position, 3);
                     }
@@ -1931,7 +1932,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<tag/")
+                            Bytes(b"<tag/>")
                         );
                         assert_eq!(position, 6);
                     }
@@ -1945,7 +1946,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:/")
+                            Bytes(b"<:/>")
                         );
                         assert_eq!(position, 4);
                     }
@@ -1959,7 +1960,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"<:tag/")
+                            Bytes(b"<:tag/>")
                         );
                         assert_eq!(position, 7);
                     }
@@ -1973,7 +1974,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/"#)
+                            Bytes(br#"<tag  attr-1="/>"  attr2  =  '/>'  3attr/>"#)
                         );
                         assert_eq!(position, 42);
                     }
@@ -1992,7 +1993,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</ ")
+                            Bytes(b"</ >")
                         );
                         assert_eq!(position, 4);
                     }
@@ -2006,7 +2007,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</tag")
+                            Bytes(b"</tag>")
                         );
                         assert_eq!(position, 6);
                     }
@@ -2020,7 +2021,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</:")
+                            Bytes(b"</:>")
                         );
                         assert_eq!(position, 4);
                     }
@@ -2034,7 +2035,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(b"</:tag")
+                            Bytes(b"</:tag>")
                         );
                         assert_eq!(position, 7);
                     }
@@ -2048,7 +2049,7 @@ mod test {
 
                         assert_eq!(
                             Bytes($source(&mut input).read_with(ElementParser::default(), buf, &mut position) $(.$await)? .unwrap()),
-                            Bytes(br#"</tag  attr-1=">"  attr2  =  '>'  3attr"#)
+                            Bytes(br#"</tag  attr-1=">"  attr2  =  '>'  3attr>"#)
                         );
                         assert_eq!(position, 40);
                     }

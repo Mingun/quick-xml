@@ -300,11 +300,12 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         // Search for the end of reference or a start of another reference or a markup
         match memchr::memchr3(b';', b'&', b'<', &self[1..]) {
             Some(i) if self[i + 1] == b';' => {
-                let end = i + 1;
-                let bytes = &self[..end];
-                // +1 -- skip the end `;`
-                *self = &self[end + 1..];
-                *position += end as u64 + 1;
+                // +1 for the start `&`
+                // +1 for the end `;`
+                let end = i + 2;
+                let (bytes, rest) = self.split_at(end);
+                *self = rest;
+                *position += end as u64;
 
                 ReadRefResult::Ref(bytes)
             }
@@ -338,10 +339,10 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
         P: Parser,
     {
         if let Some(i) = parser.feed(self) {
-            // +1 for `>` which we do not include
-            *position += i as u64 + 1;
-            let bytes = &self[..i];
-            *self = &self[i + 1..];
+            let used = i + 1; // +1 for `>`
+            *position += used as u64;
+            let (bytes, rest) = self.split_at(used);
+            *self = rest;
             return Ok(bytes);
         }
 
@@ -361,14 +362,16 @@ impl<'a> XmlSource<'a, ()> for &'a [u8] {
 
         let mut bang_type = BangType::new(self.get(2).copied())?;
 
-        if let Some((bytes, i)) = bang_type.parse(&[], self) {
-            *position += i as u64;
-            *self = &self[i..];
+        if let Some(i) = bang_type.feed(&[], self) {
+            let consumed = i + 1; // +1 for `>`
+            *position += consumed as u64;
+            let (bytes, rest) = self.split_at(consumed);
+            *self = rest;
             return Ok((bang_type, bytes));
         }
 
         *position += self.len() as u64;
-        Err(bang_type.to_err().into())
+        Err(Error::Syntax(bang_type.to_err()))
     }
 
     #[inline]
