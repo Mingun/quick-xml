@@ -2615,6 +2615,18 @@ mod normalization {
         }
 
         #[test]
+        fn already_normalized() {
+            assert_eq!(
+                normalize_xml10_attribute_value("already normalized", 5, |_| { None }),
+                Ok("already normalized".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("already normalized", 5, |_| { None }),
+                Ok("already normalized".into())
+            );
+        }
+
+        #[test]
         fn only_spaces() {
             assert_eq!(
                 normalize_xml10_attribute_value("   ", 5, |_| { None }),
@@ -2662,6 +2674,15 @@ mod normalization {
             );
 
             assert_eq!(
+                normalize_xml10_attribute_value("\t\t\n\n\r\r  ", 5, |_| None),
+                Ok("        ".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("\t\t\n\n\r\r  ", 5, |_| None),
+                Ok("        ".into())
+            );
+
+            assert_eq!(
                 normalize_xml10_attribute_value("\u{0085}\u{0085}\u{0085}", 5, |_| { None }),
                 Ok("\u{0085}\u{0085}\u{0085}".into())
             );
@@ -2690,14 +2711,91 @@ mod normalization {
         }
 
         #[test]
-        fn already_normalized() {
+        fn mixed_content_normalization() {
+            // Text with both whitespace and character references
             assert_eq!(
-                normalize_xml10_attribute_value("already normalized", 5, |_| { None }),
-                Ok("already normalized".into())
+                normalize_xml10_attribute_value("hello\t&#32;\nworld", 5, |_| None),
+                Ok("hello   world".into())
             );
             assert_eq!(
-                normalize_xml11_attribute_value("already normalized", 5, |_| { None }),
-                Ok("already normalized".into())
+                normalize_xml11_attribute_value("hello\t&#32;\nworld", 5, |_| None),
+                Ok("hello   world".into())
+            );
+
+            // Whitespace around entities
+            assert_eq!(
+                normalize_xml10_attribute_value("text &entity; \n more", 5, |_| {
+                    Some("replacement")
+                }),
+                Ok("text replacement   more".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("text &entity; \n more", 5, |_| {
+                    Some("replacement")
+                }),
+                Ok("text replacement   more".into())
+            );
+
+            // Complex mix of tabs, newlines, and character references
+            // \t → space, &#65; → A, \r\n → space, &#66; → B, \t → space
+            assert_eq!(
+                normalize_xml10_attribute_value("\t&#65;\r\n&#66;\t", 5, |_| None),
+                Ok(" A B ".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("\t&#65;\r\n&#66;\t", 5, |_| None),
+                Ok(" A B ".into())
+            );
+        }
+
+        #[test]
+        fn leading_trailing_whitespace() {
+            // Leading whitespace preserved but normalized
+            assert_eq!(
+                normalize_xml10_attribute_value("  text", 5, |_| None),
+                Ok("  text".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("  text", 5, |_| None),
+                Ok("  text".into())
+            );
+
+            assert_eq!(
+                normalize_xml10_attribute_value("\t\ttext", 5, |_| None),
+                Ok("  text".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("\t\ttext", 5, |_| None),
+                Ok("  text".into())
+            );
+
+            // Trailing whitespace preserved but normalized
+            assert_eq!(
+                normalize_xml10_attribute_value("text  ", 5, |_| None),
+                Ok("text  ".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("text  ", 5, |_| None),
+                Ok("text  ".into())
+            );
+
+            assert_eq!(
+                normalize_xml10_attribute_value("text\n\n", 5, |_| None),
+                Ok("text  ".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("text\n\n", 5, |_| None),
+                Ok("text  ".into())
+            );
+
+            // Both leading and trailing
+            assert_eq!(
+                normalize_xml10_attribute_value("\n\ntext\n\n", 5, |_| None),
+                Ok("  text  ".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("\n\ntext\n\n", 5, |_| None),
+                Ok("  text  ".into())
             );
         }
 
@@ -2719,6 +2817,81 @@ mod normalization {
             assert_eq!(
                 normalize_xml11_attribute_value("string with &#x20; character", 5, |_| { None }),
                 Ok("string with   character".into())
+            );
+        }
+
+        #[test]
+        fn character_reference_edge_cases() {
+            // Invalid hex character references
+            assert!(matches!(
+                normalize_xml10_attribute_value("&#xGG;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidNumber(_)
+                ))
+            ));
+            assert!(matches!(
+                normalize_xml11_attribute_value("&#xGG;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidNumber(_)
+                ))
+            ));
+
+            // Invalid decimal character references
+            assert!(matches!(
+                normalize_xml10_attribute_value("&#ABC;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidNumber(_)
+                ))
+            ));
+
+            // Out-of-range Unicode (beyond U+10FFFF)
+            assert_eq!(
+                normalize_xml10_attribute_value("&#x110000;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidCodepoint(0x110000)
+                ))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&#x110000;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidCodepoint(0x110000)
+                ))
+            );
+
+            // Large decimal value that is not a valid Unicode codepoint
+            assert_eq!(
+                normalize_xml10_attribute_value("&#999999999;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidCodepoint(999999999)
+                ))
+            );
+
+            // Non-whitespace character references
+            assert_eq!(
+                normalize_xml10_attribute_value("&#65;&#66;&#67;", 5, |_| None),
+                Ok("ABC".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&#65;&#66;&#67;", 5, |_| None),
+                Ok("ABC".into())
+            );
+
+            // Character references at boundaries
+            assert_eq!(
+                normalize_xml10_attribute_value("&#32;text", 5, |_| None),
+                Ok(" text".into())
+            );
+            assert_eq!(
+                normalize_xml10_attribute_value("text&#32;", 5, |_| None),
+                Ok("text ".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&#32;text", 5, |_| None),
+                Ok(" text".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("text&#32;", 5, |_| None),
+                Ok("text ".into())
             );
         }
 
@@ -2790,47 +2963,6 @@ mod normalization {
         }
 
         #[test]
-        fn unclosed_entity() {
-            assert_eq!(
-                normalize_xml10_attribute_value(
-                    "string with unclosed &entity reference",
-                    //                    ^ = 21           ^ = 38
-                    5,
-                    |_| Some("replacement")
-                ),
-                Err(EscapeError::UnterminatedEntity(21..38))
-            );
-            assert_eq!(
-                normalize_xml10_attribute_value(
-                    "string with unclosed &#32 (character) reference",
-                    //                    ^ = 21                    ^ = 47
-                    5,
-                    |_| None
-                ),
-                Err(EscapeError::UnterminatedEntity(21..47))
-            );
-
-            assert_eq!(
-                normalize_xml11_attribute_value(
-                    "string with unclosed &entity reference",
-                    //                    ^ = 21           ^ = 38
-                    5,
-                    |_| Some("replacement")
-                ),
-                Err(EscapeError::UnterminatedEntity(21..38))
-            );
-            assert_eq!(
-                normalize_xml11_attribute_value(
-                    "string with unclosed &#32 (character) reference",
-                    //                    ^ = 21                    ^ = 47
-                    5,
-                    |_| None
-                ),
-                Err(EscapeError::UnterminatedEntity(21..47))
-            );
-        }
-
-        #[test]
         fn unknown_entity() {
             assert_eq!(
                 normalize_xml10_attribute_value(
@@ -2860,6 +2992,153 @@ mod normalization {
         }
 
         #[test]
+        fn predefined_entities() {
+            // Test how predefined XML entities are handled
+            assert_eq!(
+                normalize_xml10_attribute_value(
+                    "&lt;&gt;&quot;&apos;",
+                    5,
+                    resolve_predefined_entity
+                ),
+                Ok("<>\"'".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value(
+                    "&lt;&gt;&quot;&apos;",
+                    5,
+                    resolve_predefined_entity
+                ),
+                Ok("<>\"'".into())
+            );
+
+            // &amp; followed by more entities
+            assert_eq!(
+                normalize_xml10_attribute_value("&amp;&lt;", 5, resolve_predefined_entity),
+                Ok("&<".into())
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&amp;&lt;", 5, resolve_predefined_entity),
+                Ok("&<".into())
+            );
+
+            // Multiple &amp; in sequence
+            assert_eq!(
+                normalize_xml10_attribute_value("&amp;&amp;&amp;", 5, resolve_predefined_entity),
+                Ok("&&&".into())
+            );
+        }
+
+        #[test]
+        fn unclosed_entity() {
+            // Text consists only of an unterminated entity reference - no name
+            assert_eq!(
+                normalize_xml10_attribute_value("& ", 5, |_| None),
+                Err(EscapeError::UnterminatedEntity(0..2))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("& ", 5, |_| None),
+                Err(EscapeError::UnterminatedEntity(0..2))
+            );
+
+            // Text consists only of an unterminated character reference - no value
+            assert_eq!(
+                normalize_xml10_attribute_value("&# ", 5, |_| None),
+                Err(EscapeError::UnterminatedEntity(0..3))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&# ", 5, |_| None),
+                Err(EscapeError::UnterminatedEntity(0..3))
+            );
+
+            // Text consists only of an unterminated entity reference
+            assert_eq!(
+                normalize_xml10_attribute_value("&entity", 5, |_| Some("text")),
+                Err(EscapeError::UnterminatedEntity(0..7))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&entity", 5, |_| Some("text")),
+                Err(EscapeError::UnterminatedEntity(0..7))
+            );
+
+            // Unclosed entity reference within text
+            assert_eq!(
+                normalize_xml10_attribute_value(
+                    "string with unclosed &entity reference",
+                    //                    ^ = 21           ^ = 38
+                    5,
+                    |_| Some("replacement")
+                ),
+                Err(EscapeError::UnterminatedEntity(21..38))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value(
+                    "string with unclosed &entity reference",
+                    //                    ^ = 21           ^ = 38
+                    5,
+                    |_| Some("replacement")
+                ),
+                Err(EscapeError::UnterminatedEntity(21..38))
+            );
+
+            // Unclosed character reference within text
+            assert_eq!(
+                normalize_xml10_attribute_value(
+                    "string with unclosed &#32 (character) reference",
+                    //                    ^ = 21                    ^ = 47
+                    5,
+                    |_| None
+                ),
+                Err(EscapeError::UnterminatedEntity(21..47))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value(
+                    "string with unclosed &#32 (character) reference",
+                    //                    ^ = 21                    ^ = 47
+                    5,
+                    |_| None
+                ),
+                Err(EscapeError::UnterminatedEntity(21..47))
+            );
+        }
+
+        #[test]
+        fn malformed_entity() {
+            // Empty entity name - treated as unrecognized entity with empty name
+            assert_eq!(
+                normalize_xml10_attribute_value("&;", 5, |_| None),
+                Err(EscapeError::UnrecognizedEntity(1..1, "".to_string()))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&;", 5, |_| None),
+                Err(EscapeError::UnrecognizedEntity(1..1, "".to_string()))
+            );
+
+            // Numeric entity name (should be treated as unknown entity)
+            assert_eq!(
+                normalize_xml10_attribute_value("&123;", 5, |_| None),
+                Err(EscapeError::UnrecognizedEntity(1..4, "123".to_string()))
+            );
+            assert_eq!(
+                normalize_xml11_attribute_value("&123;", 5, |_| None),
+                Err(EscapeError::UnrecognizedEntity(1..4, "123".to_string()))
+            );
+
+            // Empty character reference
+            assert!(matches!(
+                normalize_xml10_attribute_value("&#;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidNumber(_)
+                ))
+            ));
+            assert!(matches!(
+                normalize_xml10_attribute_value("&#x;", 5, |_| None),
+                Err(EscapeError::InvalidCharRef(
+                    ParseCharRefError::InvalidNumber(_)
+                ))
+            ));
+        }
+
+        #[test]
         fn recursive_entity() {
             assert_eq!(
                 normalize_xml10_attribute_value("&entity; reference", 5, |_| Some(
@@ -2873,6 +3152,57 @@ mod normalization {
                     "recursive &entity;"
                 )),
                 Err(EscapeError::TooManyNestedEntities),
+            );
+        }
+
+        #[test]
+        fn recursion_depth() {
+            // Test at exactly 4 levels with limit of 5 (should work)
+            // e1 → e2 → e3 → e4 → text (4 entity expansions)
+            assert_eq!(
+                normalize_xml10_attribute_value("&e1;", 5, |entity| {
+                    match entity {
+                        "e1" => Some("&e2;"),
+                        "e2" => Some("&e3;"),
+                        "e3" => Some("&e4;"),
+                        "e4" => Some("text"),
+                        _ => None,
+                    }
+                }),
+                Ok("text".into())
+            );
+
+            // Test at exactly 5 levels with limit of 5 (should work at boundary)
+            // e1 → e2 → e3 → e4 → e5 → text (5 entity expansions)
+            assert_eq!(
+                normalize_xml10_attribute_value("&e1;", 5, |entity| {
+                    match entity {
+                        "e1" => Some("&e2;"),
+                        "e2" => Some("&e3;"),
+                        "e3" => Some("&e4;"),
+                        "e4" => Some("&e5;"),
+                        "e5" => Some("text"),
+                        _ => None,
+                    }
+                }),
+                Ok("text".into())
+            );
+
+            // Test at exactly 6 levels with limit of 5 (should fail)
+            // e1 → e2 → e3 → e4 → e5 → e6 → text (6 entity expansions exceeds limit)
+            assert_eq!(
+                normalize_xml10_attribute_value("&e1;", 5, |entity| {
+                    match entity {
+                        "e1" => Some("&e2;"),
+                        "e2" => Some("&e3;"),
+                        "e3" => Some("&e4;"),
+                        "e4" => Some("&e5;"),
+                        "e5" => Some("&e6;"),
+                        "e6" => Some("text"),
+                        _ => None,
+                    }
+                }),
+                Err(EscapeError::TooManyNestedEntities)
             );
         }
     }
