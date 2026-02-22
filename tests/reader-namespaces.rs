@@ -1235,7 +1235,7 @@ mod read_text {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1267,7 +1267,7 @@ mod read_text {
         assert_eq!(reader.read_event().unwrap(), DocType(BytesText::new("dtd")));
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1297,7 +1297,7 @@ mod read_text {
         assert_eq!(reader.read_event().unwrap(), PI(BytesPI::new("pi")));
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1330,7 +1330,7 @@ mod read_text {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1367,7 +1367,7 @@ mod read_text {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         // NOTE: due to unbalanced XML namespace still not closed
         assert_eq!(
@@ -1406,7 +1406,7 @@ mod read_text {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1442,7 +1442,7 @@ mod read_text {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1472,7 +1472,7 @@ mod read_text {
         assert_eq!(reader.read_event().unwrap(), Text(BytesText::new("text")));
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1505,7 +1505,7 @@ mod read_text {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),
@@ -1538,7 +1538,7 @@ mod read_text {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_resolved_event().unwrap(),

@@ -2,7 +2,6 @@
 //! underlying byte stream. This implementation supports not using an
 //! intermediate buffer as the byte slice itself can be used to borrow from.
 
-use std::borrow::Cow;
 use std::io;
 
 #[cfg(feature = "encoding")]
@@ -11,7 +10,7 @@ use crate::reader::EncodingRef;
 use encoding_rs::{Encoding, UTF_8};
 
 use crate::errors::{Error, Result};
-use crate::events::Event;
+use crate::events::{BytesText, Event};
 use crate::name::QName;
 use crate::parser::Parser;
 use crate::reader::{BangType, ReadRefResult, ReadTextResult, Reader, Span, XmlSource};
@@ -209,11 +208,12 @@ impl<'a> Reader<&'a [u8]> {
     /// // ...then, we could read text content until close tag.
     /// // This call will correctly handle nested <html> elements.
     /// let text = reader.read_text(end.name()).unwrap();
-    /// assert_eq!(text, Cow::Borrowed(r#"
+    /// let text = text.decode().unwrap();
+    /// assert_eq!(text, r#"
     ///         <title>This is a HTML text</title>
     ///         <p>Usual XML rules does not apply inside it
     ///         <p>For example, elements not needed to be &quot;closed&quot;
-    ///     "#));
+    ///     "#);
     /// assert!(matches!(text, Cow::Borrowed(_)));
     ///
     /// // Now we can enable checks again
@@ -225,7 +225,7 @@ impl<'a> Reader<&'a [u8]> {
     ///
     /// [`Start`]: Event::Start
     /// [`decoder()`]: Self::decoder()
-    pub fn read_text(&mut self, end: QName) -> Result<Cow<'a, str>> {
+    pub fn read_text(&mut self, end: QName) -> Result<BytesText<'a>> {
         // self.reader will be changed, so store original reference
         let buffer = self.reader;
         let span = self.read_to_end(end)?;
@@ -233,7 +233,7 @@ impl<'a> Reader<&'a [u8]> {
         let len = span.end - span.start;
         // SAFETY: `span` can only contain indexes up to usize::MAX because it
         // was created from offsets from a single &[u8] slice
-        Ok(self.decoder().decode(&buffer[0..len as usize])?)
+        Ok(BytesText::wrap(&buffer[0..len as usize], self.decoder()))
     }
 }
 

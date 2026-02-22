@@ -130,7 +130,10 @@ mod issue514 {
 
         reader.config_mut().check_end_names = false;
 
-        assert_eq!(reader.read_text(html_end.name()).unwrap(), "...");
+        assert_eq!(
+            reader.read_text(html_end.name()).unwrap(),
+            BytesText::from_escaped("...")
+        );
 
         reader.config_mut().check_end_names = true;
 
@@ -153,7 +156,10 @@ mod issue514 {
 
         reader.config_mut().check_end_names = false;
 
-        assert_eq!(reader.read_text(html_end.name()).unwrap(), "...");
+        assert_eq!(
+            reader.read_text(html_end.name()).unwrap(),
+            BytesText::from_escaped("...")
+        );
 
         reader.config_mut().check_end_names = true;
 

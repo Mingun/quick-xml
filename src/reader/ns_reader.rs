@@ -4,7 +4,6 @@
 //! [qualified names]: https://www.w3.org/TR/xml-names11/#dt-qualname
 //! [expanded names]: https://www.w3.org/TR/xml-names11/#dt-expname
 
-use std::borrow::Cow;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::ops::Deref;
@@ -725,11 +724,13 @@ impl<'i> NsReader<&'i [u8]> {
     /// // ...then, we could read text content until close tag.
     /// // This call will correctly handle nested <html> elements.
     /// let text = reader.read_text(end.name()).unwrap();
-    /// assert_eq!(text, Cow::Borrowed(r#"
+    /// let text = text.decode().unwrap();
+    /// assert_eq!(text, r#"
     ///         <title>This is a HTML text</title>
     ///         <p>Usual XML rules does not apply inside it
     ///         <p>For example, elements not needed to be &quot;closed&quot;
-    ///     "#));
+    ///     "#);
+    /// assert!(matches!(text, Cow::Borrowed(_)));
     ///
     /// // Now we can enable checks again
     /// reader.config_mut().check_end_names = true;
@@ -741,7 +742,7 @@ impl<'i> NsReader<&'i [u8]> {
     /// [`Start`]: Event::Start
     /// [`decoder()`]: Reader::decoder()
     #[inline]
-    pub fn read_text(&mut self, end: QName) -> Result<Cow<'i, str>> {
+    pub fn read_text(&mut self, end: QName) -> Result<BytesText<'i>> {
         // According to the https://www.w3.org/TR/xml11/#dt-etag, end name should
         // match literally the start name. See `Self::check_end_names` documentation
         let result = self.reader.read_text(end)?;

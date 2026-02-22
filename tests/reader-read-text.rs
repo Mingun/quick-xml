@@ -29,7 +29,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -61,7 +61,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -88,7 +88,7 @@ mod borrowed {
         assert_eq!(reader.read_event().unwrap(), Event::PI(BytesPI::new("pi")));
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -118,7 +118,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -149,7 +149,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -181,7 +181,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -211,7 +211,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -241,7 +241,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -271,7 +271,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
@@ -302,7 +302,7 @@ mod borrowed {
         );
         assert_eq!(
             reader.read_text(QName(b"root")).unwrap(),
-            "<root/><root></root>"
+            BytesText::from_escaped("<root/><root></root>")
         );
         assert_eq!(
             reader.read_event().unwrap(),
