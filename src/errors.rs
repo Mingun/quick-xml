@@ -5,7 +5,7 @@ use crate::escape::EscapeError;
 use crate::events::attributes::AttrError;
 use crate::name::{NamespaceError, QName};
 use std::fmt;
-use std::io::Error as IoError;
+use std::io::{Error as IoError, ErrorKind as IoErrorKind};
 use std::sync::Arc;
 
 /// An error returned if parsed document does not correspond to the XML grammar,
@@ -221,7 +221,13 @@ impl From<IoError> for Error {
     /// Creates a new `Error::Io` from the given error
     #[inline]
     fn from(error: IoError) -> Error {
-        Self::Io(Arc::new(error))
+        match error.kind() {
+            IoErrorKind::InvalidData => match error.downcast::<EncodingError>() {
+                Ok(err) => Self::Encoding(err),
+                Err(err) => Self::Io(Arc::new(err)),
+            },
+            _ => Self::Io(Arc::new(error)),
+        }
     }
 }
 

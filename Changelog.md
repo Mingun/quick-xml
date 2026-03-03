@@ -18,6 +18,8 @@ MSRV bumped to 1.79.
 
 ### New Features
 
+- [#956]: Add `DecodingReader`, a `BufRead` adapter that auto-detects encoding
+  from BOM or XML declaration and transcodes to UTF-8. Enabled by the `encoding` feature.
 - [#938]: Add new enumeration `XmlVersion` and typified getter `BytesDecl::xml_version()`.
 - [#938]: Add new error variant `IllFormedError::UnknownVersion`.
 - [#371]: Add new error variant `EscapeError::TooManyNestedEntities`.

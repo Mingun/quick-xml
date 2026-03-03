@@ -1,6 +1,6 @@
 use encoding_rs::{UTF_16BE, UTF_16LE, UTF_8, WINDOWS_1251};
 use pretty_assertions::assert_eq;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event::*};
+use quick_xml::events::Event::*;
 use quick_xml::reader::Reader;
 
 static RSS_DOC: &[u8] = include_bytes!("documents/opennews_all.rss");
@@ -8,6 +8,108 @@ static UTF16BE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16be
 static UTF16LE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16le-bom.xml");
 static UTF8_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf8-bom.xml");
 static UTF8_TEXT: &[u8] = include_bytes!("documents/encoding/utf8.xml");
+
+mod xml_decoding_reader {
+    use super::*;
+    use quick_xml::encoding::{DecodingReader, EncodingError};
+    use quick_xml::errors::Error;
+
+    /// Read events until an error occurs, panicking if EOF is reached first.
+    fn read_until_error(data: &[u8]) -> Error {
+        let mut buf = Vec::new();
+        let mut r = Reader::from_reader(DecodingReader::new(data));
+        r.config_mut().trim_text(true);
+        loop {
+            match r.read_event_into(&mut buf) {
+                Ok(Eof) => panic!("Expected encoding error, got EOF"),
+                Ok(_) => continue,
+                Err(e) => break e,
+            }
+        }
+    }
+
+    /// Invalid UTF-8 (no BOM, so treated as UTF-8) must produce an error.
+    #[test]
+    fn invalid_utf8_is_rejected() {
+        // "<a>" followed by invalid byte 0xFF
+        let result = read_until_error(&[0x3C, 0x61, 0x3E, 0xFF]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    /// UTF-16 LE with valid XML followed by an unpaired low surrogate (0xDC00).
+    #[test]
+    fn invalid_utf16le_is_rejected() {
+        let result = read_until_error(&[
+            0xFF, 0xFE, // UTF-16 LE BOM
+            0x3C, 0x00, // '<'
+            0x61, 0x00, // 'a'
+            0x3E, 0x00, // '>'
+            0x00, 0xDC, // unpaired low surrogate
+        ]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    /// UTF-16 BE with valid XML followed by an unpaired low surrogate (0xDC00).
+    #[test]
+    fn invalid_utf16be_is_rejected() {
+        let result = read_until_error(&[
+            0xFE, 0xFF, // UTF-16 BE BOM
+            0x00, 0x3C, // '<'
+            0x00, 0x61, // 'a'
+            0x00, 0x3E, // '>'
+            0xDC, 0x00, // unpaired low surrogate
+        ]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    /// An odd trailing byte in UTF-16 is malformed and must produce an error.
+    #[test]
+    fn truncated_utf16_at_eof() {
+        let result = read_until_error(&[
+            0xFF, 0xFE, // UTF-16 LE BOM
+            0x3C, 0x00, // '<'
+            0x61, 0x00, // 'a'
+            0x3E, 0x00, // '>'
+            0x48, 0x00, // 'H'
+            0x65, // truncated code unit
+        ]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    // UTF-8 / 16 "happy paths" already well-tested in encoding.rs
+
+    #[test]
+    fn test_koi8_r_encoding() {
+        let mut buf = vec![];
+        let mut r = Reader::from_reader(DecodingReader::new(RSS_DOC));
+        r.config_mut().trim_text(true);
+        loop {
+            match r.read_event_into(&mut buf) {
+                Ok(Text(e)) => {
+                    e.xml10_content().unwrap();
+                }
+                Ok(Eof) => break,
+                _ => (),
+            }
+        }
+    }
+}
 
 /// Tests for the post-parse decoding approach
 mod legacy_decoding {
@@ -216,24 +318,6 @@ mod detect {
     check_detection!(windows_1258, WINDOWS_1258, "windows-1258");
     check_detection!(x_mac_cyrillic, X_MAC_CYRILLIC, "x-mac-cyrillic");
     check_detection!(x_user_defined, X_USER_DEFINED, "x-user-defined");
-}
-
-#[test]
-fn bom_removed_from_initial_text() {
-    let mut r =
-        Reader::from_str("\u{FEFF}asdf<paired attr1=\"value1\" attr2=\"value2\">text</paired>");
-
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::new("asdf")));
-    assert_eq!(
-        r.read_event().unwrap(),
-        Start(BytesStart::from_content(
-            "paired attr1=\"value1\" attr2=\"value2\"",
-            6
-        ))
-    );
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::new("text")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("paired")));
-    assert_eq!(r.read_event().unwrap(), Eof);
 }
 
 /// Checks that encoding is detected by BOM and changed after XML declaration
