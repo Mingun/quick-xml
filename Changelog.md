@@ -18,7 +18,13 @@
 
 ### Bug Fixes
 
+- [#950]: Fix subtraction with overflow when parse malformed DTD in some cases.
+  Note, that currently we do not check the validity of DTD, so the returned `Event::DocType`
+  may contain the malformed DTD.
+
 ### Misc Changes
+
+[#950]: https://github.com/tafia/quick-xml/issues/950
 
 
 ## 0.39.2 -- 2026-02-20

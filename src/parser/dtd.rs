@@ -252,7 +252,6 @@ impl DtdParser {
             // or markup is not known.
             // Undecided markup bytes will be written to `buf` to be available on
             // next iteration.
-            _ if markup.len() < 9 => None,
             _ => {
                 // FIXME: to correctly report error position in DTD we need to provide
                 // DTD events. For now our task just to skip (correct) DTD, so we postpone
@@ -261,7 +260,7 @@ impl DtdParser {
                     *self = Self::InsideOfInternalSubset;
                     Some(i + 1)
                 } else {
-                    Some(markup.len())
+                    None
                 }
             }
         }
