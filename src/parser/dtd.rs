@@ -92,12 +92,12 @@ impl DtdParser {
                             b'\'' | b'"' => {
                                 // SystemLiteral or PubidLiteral
                                 *self = Self::BeforeInternalSubset(b);
-                                cur = &cur[i + 1..];
+                                cur = &cur[i + 1..]; // +1 to skip `'` or `"`
                                 continue;
                             }
                             b'[' => {
                                 *self = Self::InsideOfInternalSubset;
-                                cur = &cur[i + 1..];
+                                cur = &cur[i + 1..]; // +1 to skip `[`
                                 continue;
                             }
                             b'>' => {
@@ -122,7 +122,7 @@ impl DtdParser {
                     break;
                 }
                 Self::InsideOfInternalSubset => {
-                    // Find the end of internal subset ([) or the start of the markup inside (<)
+                    // Find the end of internal subset (]) or the start of the markup inside (<)
                     if let Some(i) = memchr::memchr2(b']', b'<', cur) {
                         if cur[i] == b']' {
                             *self = Self::AfterInternalSubset;
@@ -258,7 +258,7 @@ impl DtdParser {
                 // error reporting and go with ending the unknown markup with `>`.
                 if let Some(i) = memchr::memchr(b'>', markup) {
                     *self = Self::InsideOfInternalSubset;
-                    Some(i + 1)
+                    Some(i + 1) // +1 to skip `>`
                 } else {
                     None
                 }
