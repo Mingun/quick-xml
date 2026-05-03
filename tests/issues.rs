@@ -647,3 +647,22 @@ fn issue939() {
 
     assert_eq!(reader.read_event_into(&mut buf).unwrap(), Event::Eof);
 }
+
+/// Regression test for https://github.com/tafia/quick-xml/issues/950
+#[test]
+fn issue950() {
+    // This DTD is malformed, because
+    // - it contains invalid markup `<>`
+    // - it contains unpaired `>` in internal subset
+    // To correctly report error position in DTD we need to provide DTD events.
+    // For now our task just to skip (correct) DTD, so we postpone error reporting
+    // and go with ending the unknown markup with `>` and skip any unpaired `>`.
+    let reader = BufReader::with_capacity(16, "<!DOCTYPE x[<>12>34567]>".as_bytes());
+    //                                 chunks: ________________--------
+    let mut reader = Reader::from_reader(reader);
+    let mut buf = Vec::new();
+    // Because DTD is malformed and we want to report parsing error in the future,
+    // but currently return Event::DocType, we do not check the read result,
+    // but just ensure that we do not panic
+    let _ = reader.read_event_into(&mut buf);
+}

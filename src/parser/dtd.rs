@@ -92,12 +92,12 @@ impl DtdParser {
                             b'\'' | b'"' => {
                                 // SystemLiteral or PubidLiteral
                                 *self = Self::BeforeInternalSubset(b);
-                                cur = &cur[i + 1..];
+                                cur = &cur[i + 1..]; // +1 to skip `'` or `"`
                                 continue;
                             }
                             b'[' => {
                                 *self = Self::InsideOfInternalSubset;
-                                cur = &cur[i + 1..];
+                                cur = &cur[i + 1..]; // +1 to skip `[`
                                 continue;
                             }
                             b'>' => {
@@ -122,7 +122,7 @@ impl DtdParser {
                     break;
                 }
                 Self::InsideOfInternalSubset => {
-                    // Find the end of internal subset ([) or the start of the markup inside (<)
+                    // Find the end of internal subset (]) or the start of the markup inside (<)
                     if let Some(i) = memchr::memchr2(b']', b'<', cur) {
                         if cur[i] == b']' {
                             *self = Self::AfterInternalSubset;
@@ -252,16 +252,15 @@ impl DtdParser {
             // or markup is not known.
             // Undecided markup bytes will be written to `buf` to be available on
             // next iteration.
-            _ if markup.len() < 9 => None,
             _ => {
                 // FIXME: to correctly report error position in DTD we need to provide
                 // DTD events. For now our task just to skip (correct) DTD, so we postpone
                 // error reporting and go with ending the unknown markup with `>`.
                 if let Some(i) = memchr::memchr(b'>', markup) {
                     *self = Self::InsideOfInternalSubset;
-                    Some(i + 1)
+                    Some(i + 1) // +1 to skip `>`
                 } else {
-                    Some(markup.len())
+                    None
                 }
             }
         }

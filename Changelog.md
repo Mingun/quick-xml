@@ -37,6 +37,9 @@
 
 - [#938]: Use correct rules for EOL normalization in `Deserializer` when parse XML 1.0 documents.
   Previously XML 1.1. rules was applied.
+- [#950]: Fix subtraction with overflow when parse malformed DTD in some cases.
+  Note, that currently we do not check the validity of DTD, so the returned `Event::DocType`
+  may contain the malformed DTD.
 
 ### Misc Changes
 
@@ -51,6 +54,7 @@
 [#914]: https://github.com/tafia/quick-xml/pull/914
 [#938]: https://github.com/tafia/quick-xml/pull/938
 [#944]: https://github.com/tafia/quick-xml/pull/944
+[#950]: https://github.com/tafia/quick-xml/issues/950
 
 
 ## 0.39.2 -- 2026-02-20
