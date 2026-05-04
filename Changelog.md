@@ -16,6 +16,8 @@
 
 MSRV bumped to 1.79.
 
+Now `quick-xml` supports the UTF-16 encoded documents. See the new `DecodingReader` type.
+
 ### New Features
 
 - [#956]: Add `DecodingReader`, a `BufRead` adapter that auto-detects encoding

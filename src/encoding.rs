@@ -308,6 +308,19 @@ impl DetectedEncoding {
     }
 }
 
+// Bytes read upfront so `set_encoding()` can be called before the main
+// decode loop. Kept small (just enough for an XML declaration) to limit
+// bytes decoded with a potentially wrong initial encoding.
+#[cfg(feature = "encoding")]
+const PREFIX_CAP: usize = 64;
+
+#[cfg(feature = "encoding")]
+struct Prefix {
+    buf: [u8; PREFIX_CAP],
+    len: usize,
+    detected: bool,
+}
+
 /// A reader wrapper that decodes a byte stream from any encoding into UTF-8.
 ///
 /// This reader wraps a [`BufRead`] source and uses [`encoding_rs::Decoder`] to
@@ -330,6 +343,41 @@ impl DetectedEncoding {
 /// reader.read_to_end(&mut buf).unwrap();
 /// assert_eq!(buf, data);
 /// ```
+///
+/// The example below shows how you can read documents using `DecodingReader`:
+/// ```
+/// use quick_xml::encoding::DecodingReader;
+/// use quick_xml::events::Event;
+/// use quick_xml::reader::Reader;
+///
+/// # fn to_utf16le_with_bom(string: &str) -> Vec<u8> {
+/// #     let mut bytes = Vec::new();
+/// #     bytes.extend_from_slice(&[0xFF, 0xFE]); // UTF-16 LE BOM
+/// #     for ch in string.encode_utf16() {
+/// #         bytes.extend_from_slice(&ch.to_le_bytes());
+/// #     }
+/// #     bytes
+/// # }
+/// let xml = to_utf16le_with_bom("<?xml encoding='UTF-16'?><element/>");
+/// let mut decoder = DecodingReader::new(xml.as_ref());
+/// let mut reader = Reader::from_reader(decoder);
+///
+/// let mut buf = Vec::new();
+/// loop {
+///     buf.clear();
+///     match reader.read_event_into(&mut buf).unwrap() {
+///         Event::Decl(e) => {
+///             // If XML declaration contains unknown encoding name, None is returned
+///             match e.encoder() {
+///                 Some(encoding) => reader.get_mut().set_encoding(encoding),
+///                 None => panic!("Unsupported encoding {:?}", e.encoding()),
+///             }
+///         }
+///         Event::Eof => break,
+///         _ => {}
+///     }
+/// }
+/// ```
 #[cfg(feature = "encoding")]
 pub struct DecodingReader<R> {
     inner: R,
@@ -343,14 +391,12 @@ pub struct DecodingReader<R> {
     out_pos: usize,
     /// End of valid data in out_buf
     out_len: usize,
-    /// Bytes read during encoding detection that still need decoding.
-    /// detect_encoding() needs up to 4 bytes, minus any BOM that was consumed.
-    prefix: [u8; 4],
-    prefix_len: usize,
+    /// Bytes read upfront for encoding detection and XML declaration buffering.
+    /// `Some` until the prefix is fully drained; `None` afterward (main decode
+    /// path takes over and the allocation is freed).
+    prefix: Option<Box<Prefix>>,
     /// Whether the inner reader has reached EOF
     inner_eof: bool,
-    /// Whether encoding detection has happened
-    encoding_detected: bool,
 }
 
 #[cfg(feature = "encoding")]
@@ -362,7 +408,7 @@ impl<R: std::fmt::Debug> std::fmt::Debug for DecodingReader<R> {
             .field("out_pos", &self.out_pos)
             .field("out_len", &self.out_len)
             .field("inner_eof", &self.inner_eof)
-            .field("encoding_detected", &self.encoding_detected)
+            .field("prefix_active", &self.prefix.is_some())
             .finish()
     }
 }
@@ -381,10 +427,12 @@ impl<R> DecodingReader<R> {
             out_buf: vec![0u8; 8192].into_boxed_slice(),
             out_pos: 0,
             out_len: 0,
-            prefix: [0; 4],
-            prefix_len: 0,
+            prefix: Some(Box::new(Prefix {
+                buf: [0; PREFIX_CAP],
+                len: 0,
+                detected: false,
+            })),
             inner_eof: false,
-            encoding_detected: false,
         }
     }
 
@@ -410,6 +458,30 @@ impl<R> DecodingReader<R> {
     pub fn encoding(&self) -> &'static encoding_rs::Encoding {
         self.decoder.encoding()
     }
+
+    /// Replaces the decoder with one for the given encoding. The encoding
+    /// must be ASCII-compatible (the parser cannot read the declaration otherwise).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the prefix buffer has already been drained. Must be called
+    /// before the prefix is exhausted — in practice, right after parsing
+    /// the XML declaration.
+    pub fn set_encoding(&mut self, encoding: &'static encoding_rs::Encoding) {
+        // No-op when the encoding matches - replacing the decoder would discard
+        // its internal state (e.g. a partial multi-byte sequence), corrupting output.
+        // This check is safe regardless of prefix state since nothing changes.
+        if self.decoder.encoding() == encoding {
+            return;
+        }
+        assert!(
+            self.prefix.is_some(),
+            "set_encoding() called after prefix buffer was drained; \
+             encoding can only be changed while the prefix is still active"
+        );
+        self.decoder = encoding.new_decoder_without_bom_handling();
+        self.decoder_finished = false;
+    }
 }
 
 #[cfg(feature = "encoding")]
@@ -424,30 +496,83 @@ impl<R: BufRead> BufRead for DecodingReader<R> {
         self.out_pos = 0;
         self.out_len = 0;
 
-        // On first access, read up to 4 bytes so that detect_encoding()
-        // has enough data to function.
-        if !self.encoding_detected {
-            self.encoding_detected = true;
+        if let Some(prefix) = &mut self.prefix {
+            // On first access, fill the prefix buffer and detect encoding.
+            // The prefix is large enough to hold an entire XML declaration,
+            // ensuring set_encoding() can be called before the greedy main
+            // decode path consumes from inner.
+            if !prefix.detected {
+                prefix.detected = true;
 
-            while self.prefix_len < 4 {
-                match self.inner.read(&mut self.prefix[self.prefix_len..]) {
-                    Ok(0) => break,
-                    Ok(n) => self.prefix_len += n,
-                    Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                    Err(e) => return Err(e),
+                while prefix.len < PREFIX_CAP {
+                    match self.inner.read(&mut prefix.buf[prefix.len..]) {
+                        Ok(0) => {
+                            self.inner_eof = true;
+                            break;
+                        }
+                        Ok(n) => prefix.len += n,
+                        Err(e) if e.kind() == io::ErrorKind::Interrupted => continue,
+                        Err(e) => return Err(e),
+                    }
+                }
+
+                let detection_bytes = &prefix.buf[..prefix.len];
+                if let Some(detected) = detect_encoding(detection_bytes) {
+                    let bom_len = detected.bom_len();
+                    if bom_len > 0 {
+                        prefix.buf.copy_within(bom_len..prefix.len, 0);
+                        prefix.len -= bom_len;
+                    }
+                    let encoding = detected.encoding();
+                    if encoding != encoding_rs::UTF_8 {
+                        self.decoder = encoding.new_decoder_without_bom_handling();
+                    }
                 }
             }
 
-            let detection_bytes = &self.prefix[..self.prefix_len];
-            if let Some(detected) = detect_encoding(detection_bytes) {
-                let bom_len = detected.bom_len();
-                if bom_len > 0 {
-                    self.prefix.copy_within(bom_len..self.prefix_len, 0);
-                    self.prefix_len -= bom_len;
+            if self.decoder_finished {
+                return Ok(&[]);
+            }
+
+            // Prefix fully decoded on a previous call - drop it and fall
+            // through to the main decode path.
+            if prefix.len == 0 {
+                self.prefix = None;
+            } else {
+                // Decode from prefix buffer
+                let src = &prefix.buf[..prefix.len];
+                let (result, read, written) = self.decoder.decode_to_utf8_without_replacement(
+                    src,
+                    &mut self.out_buf[..],
+                    false,
+                );
+                prefix.buf.copy_within(read..prefix.len, 0);
+                prefix.len -= read;
+                self.out_len = written;
+
+                match result {
+                    encoding_rs::DecoderResult::InputEmpty if written > 0 => {
+                        return Ok(&self.out_buf[..self.out_len]);
+                    }
+                    encoding_rs::DecoderResult::InputEmpty => {
+                        // prefix.len is now 0; keep prefix alive for
+                        // set_encoding() - it will be dropped on the next call.
+                    }
+                    encoding_rs::DecoderResult::OutputFull => {
+                        return Ok(&self.out_buf[..self.out_len]);
+                    }
+                    encoding_rs::DecoderResult::Malformed(_, _) => {
+                        return Err(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            EncodingError::Other(self.decoder.encoding()),
+                        ));
+                    }
                 }
-                let encoding = detected.encoding();
-                if encoding != encoding_rs::UTF_8 {
-                    self.decoder = encoding.new_decoder_without_bom_handling();
+                // InputEmpty with written == 0: prefix drained, decoder may
+                // hold partial internal state (e.g. a lone byte of UTF-16).
+                // Drop prefix and fall through to the main decode path.
+                if prefix.len == 0 {
+                    self.prefix = None;
                 }
             }
         }
@@ -475,8 +600,6 @@ impl<R: BufRead> BufRead for DecodingReader<R> {
                         return Ok(&self.out_buf[..self.out_len]);
                     }
                     encoding_rs::DecoderResult::OutputFull => {
-                        // Decoder has more output than fits in out_buf;
-                        // return what we have now, next fill_buf will flush more.
                         return Ok(&self.out_buf[..self.out_len]);
                     }
                     encoding_rs::DecoderResult::Malformed(_, _) => {
@@ -486,36 +609,6 @@ impl<R: BufRead> BufRead for DecodingReader<R> {
                         ));
                     }
                 }
-            }
-
-            // Drain prefix bytes left over from encoding detection
-            if self.prefix_len > 0 {
-                let src = &self.prefix[..self.prefix_len];
-                let (result, read, written) = self.decoder.decode_to_utf8_without_replacement(
-                    src,
-                    &mut self.out_buf[..],
-                    false,
-                );
-                self.prefix.copy_within(read..self.prefix_len, 0);
-                self.prefix_len -= read;
-                self.out_len = written;
-
-                match result {
-                    encoding_rs::DecoderResult::InputEmpty if written > 0 => {
-                        return Ok(&self.out_buf[..self.out_len]);
-                    }
-                    encoding_rs::DecoderResult::InputEmpty => {}
-                    encoding_rs::DecoderResult::OutputFull => {
-                        return Ok(&self.out_buf[..self.out_len]);
-                    }
-                    encoding_rs::DecoderResult::Malformed(_, _) => {
-                        return Err(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            EncodingError::Other(self.decoder.encoding()),
-                        ));
-                    }
-                }
-                continue;
             }
 
             // Main decode path: read from inner, decode into out_buf
@@ -747,8 +840,8 @@ mod decoding_reader {
         use pretty_assertions::assert_eq;
         use std::io::BufRead;
 
-        /// Basic fill_buf/consume cycle: first fill returns data starting with 'H',
-        /// consuming it yields more data on the next fill.
+        /// Basic fill_buf/consume cycle: partial consume leaves remaining
+        /// data available on the next fill_buf call.
         #[test]
         fn fill_buf_and_consume() {
             let data = b"Hello, World!";
@@ -758,11 +851,12 @@ mod decoding_reader {
             assert!(!buf.is_empty());
             assert_eq!(buf[0], b'H');
 
-            let len = buf.len();
-            reader.consume(len);
+            // Consume only part of the buffer
+            reader.consume(5);
 
             let buf = reader.fill_buf().unwrap();
             assert!(!buf.is_empty());
+            assert_eq!(buf[0], b',');
         }
 
         /// Drain the reader via fill_buf/consume, then confirm it stays at EOF.
@@ -858,6 +952,103 @@ mod decoding_reader {
         fn encoding_default_is_utf8() {
             let reader = DecodingReader::new(&b"Hello"[..]);
             assert_eq!(reader.encoding(), encoding_rs::UTF_8);
+        }
+    }
+
+    // TODO: These tests emulate the updating of the internal decoder after reading the XML decl.
+    // Since `Reader` currently only speaks the `BufRead` trait, we can't test that directly.
+    // Eventually once `Reader` knows about the underlying `DecodingReader` we should test
+    // that directly.
+
+    /// Tests for encoding() and set_encoding(): detection, switching,
+    /// same-encoding no-op safety, and mid-stream override behavior.
+    mod encoding_switching {
+        use super::*;
+        use pretty_assertions::assert_eq;
+        use std::io::BufRead;
+
+        /// Encoding reflects BOM detection after first read.
+        #[test]
+        fn encoding_reflects_detection() {
+            let data = utf16le_with_bom("Hello");
+            let mut reader = DecodingReader::new(&data[..]);
+            let _ = read_all(&mut reader).unwrap();
+            assert_eq!(reader.encoding(), encoding_rs::UTF_16LE);
+        }
+
+        /// set_encoding switches the active decoder.
+        #[test]
+        fn set_encoding_changes_encoding() {
+            let mut reader = DecodingReader::new(&b"Hello"[..]);
+            assert_eq!(reader.encoding(), encoding_rs::UTF_8);
+            reader.set_encoding(encoding_rs::UTF_16LE);
+            assert_eq!(reader.encoding(), encoding_rs::UTF_16LE);
+        }
+
+        /// set_encoding after reading preserves already-buffered output.
+        #[test]
+        fn set_encoding_preserves_buffered_output() {
+            let data = b"Hello";
+            let mut reader = DecodingReader::new(&data[..]);
+
+            let buf = reader.fill_buf().unwrap();
+            assert_eq!(buf, b"Hello");
+
+            reader.set_encoding(encoding_rs::WINDOWS_1252);
+            assert_eq!(reader.encoding(), encoding_rs::WINDOWS_1252);
+
+            // Buffered data is unchanged
+            let buf = reader.fill_buf().unwrap();
+            assert_eq!(buf, b"Hello");
+        }
+
+        /// Calling set_encoding with the already-active encoding is a no-op:
+        /// the decoder's internal state is preserved and decoding continues
+        /// without corruption.
+        #[test]
+        fn set_encoding_same_as_detected_is_noop() {
+            let data = b"Hello, World!";
+            let mut reader = DecodingReader::new(&data[..]);
+
+            // Trigger detection and consume the first chunk
+            let first_chunk;
+            {
+                let buf = reader.fill_buf().unwrap();
+                assert!(buf.len() > 0);
+                first_chunk = std::str::from_utf8(buf).unwrap().to_string();
+                let n = buf.len();
+                reader.consume(n);
+            }
+            assert_eq!(reader.encoding(), encoding_rs::UTF_8);
+
+            // "Re-set" to the same encoding - must not reset decoder state
+            reader.set_encoding(encoding_rs::UTF_8);
+            assert_eq!(reader.encoding(), encoding_rs::UTF_8);
+
+            // Read the rest - combined output must equal the original string
+            let rest = read_all(&mut reader).unwrap();
+            assert_eq!(format!("{first_chunk}{rest}"), "Hello, World!");
+        }
+
+        /// set_encoding mid-stream: read some UTF-8 data, switch encoding,
+        /// then verify the encoding accessor reflects the change.
+        #[test]
+        fn set_encoding_mid_stream() {
+            let data = b"Hello, World!";
+            let mut reader = DecodingReader::new(&data[..]);
+
+            // Read a few bytes under UTF-8
+            let buf = reader.fill_buf().unwrap();
+            let n = std::cmp::min(buf.len(), 5);
+            reader.consume(n);
+
+            assert_eq!(reader.encoding(), encoding_rs::UTF_8);
+            reader.set_encoding(encoding_rs::WINDOWS_1252);
+            assert_eq!(reader.encoding(), encoding_rs::WINDOWS_1252);
+
+            // Remaining data still readable (ASCII is identical in both encodings)
+            let rest = read_all(&mut reader).unwrap();
+            assert_eq!(rest, ", World!");
         }
     }
 
