@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<server name="app-east-1" version="3.4.1">
+  <network>
+    <listen address="0.0.0.0" port="8080"/>
+    <listen address="::1" port="8443" tls="true"/>
+    <max_connections>1024</max_connections>
+    <timeout unit="seconds">30</timeout>
+  </network>
+
+  <logging level="info">
+    <output type="file" path="/var/log/app/server.log" rotate="daily"/>
+    <output type="stdout" format="json"/>
+    <filters>
+      <filter module="db" level="warn"/>
+      <filter module="http" level="debug"/>
+      <filter module="auth" level="trace"/>
+    </filters>
+  </logging>
+
+  <database>
+    <primary host="db-primary.internal" port="5432">
+      <name>appdb</name>
+      <pool min="5" max="20"/>
+      <credentials user="app_svc" password-env="DB_PASSWORD"/>
+    </primary>
+    <replica host="db-replica-1.internal" port="5432">
+      <name>appdb</name>
+      <pool min="2" max="10"/>
+      <credentials user="app_readonly" password-env="DB_RO_PASSWORD"/>
+    </replica>
+  </database>
+
+  <cache>
+    <backend type="redis" url="redis://cache.internal:6379/0"/>
+    <ttl default="300" max="3600"/>
+    <eviction policy="lru"/>
+  </cache>
+
+  <auth>
+    <session cookie="sid" secure="true" max-age="86400"/>
+    <providers>
+      <provider type="local">
+        <password-hash algorithm="argon2id"/>
+        <lockout attempts="5" duration="900"/>
+      </provider>
+      <provider type="oauth2" name="github">
+        <client-id env="GITHUB_CLIENT_ID"/>
+        <client-secret env="GITHUB_CLIENT_SECRET"/>
+        <scopes>read:user,user:email</scopes>
+        <redirect-uri>https://app.example.com/auth/github/callback</redirect-uri>
+      </provider>
+      <provider type="oauth2" name="google">
+        <client-id env="GOOGLE_CLIENT_ID"/>
+        <client-secret env="GOOGLE_CLIENT_SECRET"/>
+        <scopes>openid,email,profile</scopes>
+        <redirect-uri>https://app.example.com/auth/google/callback</redirect-uri>
+      </provider>
+    </providers>
+  </auth>
+
+  <routes>
+    <route method="GET" path="/health">
+      <handler>health_check</handler>
+    </route>
+    <route method="GET" path="/api/v1/users">
+      <handler>list_users</handler>
+      <middleware>auth,rate_limit</middleware>
+    </route>
+    <route method="POST" path="/api/v1/users">
+      <handler>create_user</handler>
+      <middleware>auth,admin,rate_limit</middleware>
+    </route>
+    <route method="GET" path="/api/v1/users/:id">
+      <handler>get_user</handler>
+      <middleware>auth</middleware>
+    </route>
+    <route method="PUT" path="/api/v1/users/:id">
+      <handler>update_user</handler>
+      <middleware>auth,owner_or_admin</middleware>
+    </route>
+    <route method="DELETE" path="/api/v1/users/:id">
+      <handler>delete_user</handler>
+      <middleware>auth,admin</middleware>
+    </route>
+  </routes>
+
+  <scheduled-tasks>
+    <task name="cleanup-sessions" cron="0 */6 * * *">
+      <handler>session_cleanup</handler>
+      <timeout>120</timeout>
+    </task>
+    <task name="generate-reports" cron="0 2 * * 1">
+      <handler>weekly_report</handler>
+      <timeout>600</timeout>
+      <notify email="ops@example.com"/>
+    </task>
+    <task name="db-vacuum" cron="0 4 * * 0">
+      <handler>vacuum_analyze</handler>
+      <timeout>1800</timeout>
+    </task>
+  </scheduled-tasks>
+</server>
