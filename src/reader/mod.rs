@@ -318,7 +318,7 @@ macro_rules! read_event_impl {
                             $self.state.last_error_offset = start;
                             Err(Error::IllFormed(IllFormedError::UnclosedReference))
                         }
-                        ReadRefResult::Err(e) => Err(Error::Io(e.into())),
+                        ReadRefResult::Err(e) => Err(Error::from(e)),
                     }
                 }
                 ParseState::InsideText => { // Go to InsideMarkup or Done state
@@ -362,7 +362,7 @@ macro_rules! read_event_impl {
                                 Ok(Event::Text(event))
                             }
                         }
-                        ReadTextResult::Err(e) => Err(Error::Io(e.into())),
+                        ReadTextResult::Err(e) => Err(Error::from(e)),
                     }
                 },
                 // Go to InsideText state in next two arms
@@ -475,7 +475,7 @@ macro_rules! read_until_close {
                 $self.state.last_error_offset = start;
                 Err(Error::Syntax(SyntaxError::UnclosedTag))
             }
-            Err(e) => Err(Error::Io(e.into())),
+            Err(e) => Err(Error::from(e)),
         }
     }};
 }
