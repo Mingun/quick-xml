@@ -37,6 +37,10 @@
 
 - [#938]: Use correct rules for EOL normalization in `Deserializer` when parse XML 1.0 documents.
   Previously XML 1.1. rules was applied.
+- [#957]: Fix slice-index panic when reading malformed DTD whose unknown markup
+  is split across `BufReader` chunks. As with [#950], the returned
+  `Event::DocType` may contain the malformed DTD; this fix only ensures that
+  the parser does not panic.
 
 ### Misc Changes
 
@@ -51,6 +55,7 @@
 [#914]: https://github.com/tafia/quick-xml/pull/914
 [#938]: https://github.com/tafia/quick-xml/pull/938
 [#944]: https://github.com/tafia/quick-xml/pull/944
+[#957]: https://github.com/tafia/quick-xml/issues/957
 
 
 ## 0.39.3 -- 2026-05-04
