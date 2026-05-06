@@ -135,8 +135,23 @@ impl DtdParser {
                             continue;
                         }
                         // Keep the number of already looked bytes (started from byte after `<`, so -1),
-                        // try to decide after feeding the new chunk
-                        *self = Self::UndecidedMarkup(cur.len() - i - 1);
+                        // try to decide after feeding the new chunk.
+                        let skipped = cur.len() - i - 1;
+                        // The 9-byte work buffer in `UndecidedMarkup` is sized
+                        // for `!NOTATION` (the longest keyword). If the chunk
+                        // already gave us 9+ bytes after `<` and `switch()`
+                        // returned `None`, the markup is definitively not one
+                        // of `<!--`, `<![CDATA[`, `<!ELEMENT`, `<!ATTLIST`,
+                        // `<!ENTITY`, `<!NOTATION`, so skip until `>` rather
+                        // than staging more bytes than the buffer can hold
+                        // (which would panic on the slice copy in
+                        // `UndecidedMarkup`).
+                        if skipped >= 9 {
+                            cur = &cur[i + 1..];
+                            *self = Self::InElementDecl;
+                            continue;
+                        }
+                        *self = Self::UndecidedMarkup(skipped);
                     }
                     break;
                 }

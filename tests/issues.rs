@@ -680,3 +680,25 @@ fn issue957() {
     // future improvement.
     let _ = reader.read_event_into(&mut buf);
 }
+
+/// Regression test for https://github.com/tafia/quick-xml/issues/960
+#[test]
+fn issue960() {
+    // Sibling of `issue957`. The fix in #958 prevents `skipped` from growing
+    // across multiple `UndecidedMarkup` re-entries, but the same panic was
+    // still reachable via the *initial* `Self::UndecidedMarkup(cur.len() - i - 1)`
+    // assignment one arm earlier: when a single chunk delivered `<` followed
+    // by 9+ bytes of unknown markup, `skipped` was set to that long value in
+    // one shot, and the next call panicked on
+    // `bytes[..skipped].copy_from_slice(...)` against the 9-byte work buffer.
+    let reader = BufReader::with_capacity(
+        24,
+        "<!DOCTYPE r[<aaaaaaaaaaaaaaaaaaaaaaaaaaaaa>]>".as_bytes(),
+    );
+    let mut reader = Reader::from_reader(reader);
+    let mut buf = Vec::new();
+    // Same disposition as `issue950` / `issue957`: malformed DTD must not
+    // panic; we do not assert on the returned event since DTD validity
+    // reporting is a future improvement.
+    let _ = reader.read_event_into(&mut buf);
+}
