@@ -18,7 +18,15 @@
 
 ### Bug Fixes
 
+- [#957]: Fix slice-index panic when reading malformed DTD whose unknown markup
+  is split across `BufReader` chunks. As with [#950], the returned
+  `Event::DocType` may contain the malformed DTD; this fix only ensures that
+  the parser does not panic.
+
 ### Misc Changes
+
+[#950]: https://github.com/tafia/quick-xml/issues/950
+[#957]: https://github.com/tafia/quick-xml/issues/957
 
 
 ## 0.39.3 -- 2026-05-04

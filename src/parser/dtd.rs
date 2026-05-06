@@ -205,6 +205,17 @@ impl DtdParser {
                         cur = &cur[skip - skipped..];
                         continue;
                     }
+                    // No keyword matched. If we have a full 9-byte window the
+                    // markup is definitively not one of `<!--`, `<![CDATA[`,
+                    // `<!ELEMENT`, `<!ATTLIST`, `<!ENTITY`, `<!NOTATION`, so
+                    // fall back to skipping until the closing `>` instead of
+                    // accumulating `skipped` past `bytes.len()` (which would
+                    // panic on the slice-copy above on a later iteration).
+                    if end == bytes.len() {
+                        cur = &cur[end - skipped..];
+                        *self = Self::InElementDecl;
+                        continue;
+                    }
                     *self = Self::UndecidedMarkup(skipped + cur.len());
                     break;
                 }

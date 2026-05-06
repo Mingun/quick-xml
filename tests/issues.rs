@@ -660,3 +660,23 @@ fn issue950() {
     // but just ensure that we do not panic
     let _ = reader.read_event_into(&mut buf);
 }
+
+/// Regression test for https://github.com/tafia/quick-xml/issues/957
+#[test]
+fn issue957() {
+    // Each `<aa`, `<bb`, ... is unknown markup that does not match any of
+    // `<!--`, `<![CDATA[`, `<!ELEMENT`, `<!ATTLIST`, `<!ENTITY`, `<!NOTATION`
+    // and is split across `BufReader` chunks, so the DTD parser re-enters
+    // the `UndecidedMarkup` arm multiple times in a row. Before the fix,
+    // each re-entry grew `skipped` by `cur.len()` until the slice copy
+    // `bytes[..skipped]` against the 9-byte work buffer panicked with
+    // `range end index N out of range for slice of length 9`.
+    let reader = BufReader::with_capacity(4, "<!DOCTYPE r[<aa<bb<cc<dd>".as_bytes());
+    //                                chunks: ____----____----____----_
+    let mut reader = Reader::from_reader(reader);
+    let mut buf = Vec::new();
+    // Same disposition as `issue950`: malformed DTD must not panic; we do
+    // not assert on the returned event since DTD validity reporting is a
+    // future improvement.
+    let _ = reader.read_event_into(&mut buf);
+}
