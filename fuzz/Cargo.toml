@@ -31,3 +31,9 @@ name = "structured_roundtrip"
 path = "fuzz_targets/structured_roundtrip.rs"
 test = false
 doc = false
+
+[[bin]]
+name = "fuzz_chunked_reader"
+path = "fuzz_targets/fuzz_chunked_reader.rs"
+test = false
+doc = false
