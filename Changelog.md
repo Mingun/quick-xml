@@ -41,6 +41,10 @@
   is split across `BufReader` chunks. As with [#950], the returned
   `Event::DocType` may contain the malformed DTD; this fix only ensures that
   the parser does not panic.
+- [#960]: Fix sibling slice-index panic when a single chunk delivers `<` followed
+  by 9+ bytes of unknown markup inside a DTD internal subset. Same disposition
+  as [#957] / [#950]: parser must not panic; DTD validity reporting is a future
+  improvement.
 
 ### Misc Changes
 
@@ -56,6 +60,7 @@
 [#938]: https://github.com/tafia/quick-xml/pull/938
 [#944]: https://github.com/tafia/quick-xml/pull/944
 [#957]: https://github.com/tafia/quick-xml/issues/957
+[#960]: https://github.com/tafia/quick-xml/issues/960
 
 
 ## 0.39.3 -- 2026-05-04
