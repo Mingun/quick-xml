@@ -816,7 +816,7 @@ impl<'a> BytesCData<'a> {
     /// ]);
     /// ```
     #[inline]
-    pub fn escaped(content: &'a str) -> CDataIterator<'a> {
+    pub const fn escaped(content: &'a str) -> CDataIterator<'a> {
         CDataIterator {
             inner: utils::CDataIterator::new(content),
         }
