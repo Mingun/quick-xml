@@ -387,7 +387,7 @@ impl<'a> Attribute<'a> {
     /// let attr = Attribute::from(("attr", "1"));
     /// assert_eq!(attr.as_bool(), Some(true));
     ///
-    /// let attr = Attribute::from(("attr", "bot bool"));
+    /// let attr = Attribute::from(("attr", "not bool"));
     /// assert_eq!(attr.as_bool(), None);
     /// ```
     ///
