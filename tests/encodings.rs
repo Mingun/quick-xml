@@ -3,47 +3,39 @@ use pretty_assertions::assert_eq;
 use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event::*};
 use quick_xml::reader::Reader;
 
-mod decode {
-    use super::*;
-    use pretty_assertions::assert_eq;
+static RSS_DOC: &[u8] = include_bytes!("documents/opennews_all.rss");
+static UTF16BE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16be-bom.xml");
+static UTF16LE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16le-bom.xml");
+static UTF8_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf8-bom.xml");
+static UTF8_TEXT: &[u8] = include_bytes!("documents/encoding/utf8.xml");
+
+#[test]
+fn test_detect_encoding() {
     use quick_xml::encoding::detect_encoding;
 
-    static UTF16BE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16be-bom.xml");
-    static UTF16LE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16le-bom.xml");
-    static UTF8_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf8-bom.xml");
+    // No BOM
+    let detected = detect_encoding(UTF8_TEXT).unwrap();
+    assert_eq!(detected.encoding(), UTF_8);
+    assert_eq!(detected.bom_len(), 0);
 
-    static UTF8_TEXT: &str = r#"<?xml version="1.0"?>
-<project name="project-name">
-</project>
-"#;
+    // BOM
+    let detected = detect_encoding(UTF8_TEXT_WITH_BOM).unwrap();
+    assert_eq!(detected.encoding(), UTF_8);
+    assert_eq!(detected.bom_len(), 3);
 
-    #[test]
-    fn test_detect_encoding() {
-        // No BOM
-        let detected = detect_encoding(UTF8_TEXT.as_bytes()).unwrap();
-        assert_eq!(detected.encoding(), UTF_8);
-        assert_eq!(detected.bom_len(), 0);
+    let detected = detect_encoding(UTF16BE_TEXT_WITH_BOM).unwrap();
+    assert_eq!(detected.encoding(), UTF_16BE);
+    assert_eq!(detected.bom_len(), 2);
 
-        // BOM
-        let detected = detect_encoding(UTF8_TEXT_WITH_BOM).unwrap();
-        assert_eq!(detected.encoding(), UTF_8);
-        assert_eq!(detected.bom_len(), 3);
-
-        let detected = detect_encoding(UTF16BE_TEXT_WITH_BOM).unwrap();
-        assert_eq!(detected.encoding(), UTF_16BE);
-        assert_eq!(detected.bom_len(), 2);
-
-        let detected = detect_encoding(UTF16LE_TEXT_WITH_BOM).unwrap();
-        assert_eq!(detected.encoding(), UTF_16LE);
-        assert_eq!(detected.bom_len(), 2);
-    }
+    let detected = detect_encoding(UTF16LE_TEXT_WITH_BOM).unwrap();
+    assert_eq!(detected.encoding(), UTF_16LE);
+    assert_eq!(detected.bom_len(), 2);
 }
 
 #[test]
 fn test_koi8_r_encoding() {
-    let src = include_bytes!("documents/opennews_all.rss").as_ref();
     let mut buf = vec![];
-    let mut r = Reader::from_reader(src);
+    let mut r = Reader::from_reader(RSS_DOC);
     r.config_mut().trim_text(true);
     loop {
         match r.read_event_into(&mut buf) {
@@ -240,7 +232,7 @@ fn bom_removed_from_initial_text() {
 }
 
 /// Checks that encoding is detected by BOM and changed after XML declaration
-/// BOM indicates UTF-16LE, but XML - windows-1251
+/// BOM indicates UTF-16LE, but XML declares windows-1251
 #[test]
 fn bom_overridden_by_declaration() {
     let mut reader = Reader::from_reader(b"\xFF\xFE<?xml encoding='windows-1251'?>".as_ref());
