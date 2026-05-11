@@ -1169,7 +1169,7 @@ impl BangType {
     /// - `buf`: buffer with data consumed on previous iterations
     /// - `chunk`: data read on current iteration and not yet consumed from reader
     #[inline(always)]
-    fn feed<'b>(&mut self, buf: &[u8], chunk: &'b [u8]) -> Option<usize> {
+    fn feed(&mut self, buf: &[u8], chunk: &[u8]) -> Option<usize> {
         match self {
             Self::Comment => {
                 for i in memchr::memchr_iter(b'>', chunk) {
