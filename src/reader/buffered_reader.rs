@@ -205,7 +205,7 @@ macro_rules! impl_buffered_source {
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
                     Err(e) => {
                         *position += read;
-                        return Err(Error::Io(e.into()));
+                        return Err(Error::from(e));
                     }
                 };
 
@@ -250,7 +250,7 @@ macro_rules! impl_buffered_source {
                 break match self $(.$reader)? .fill_buf() $(.$await)? {
                     Ok(n) => BangType::new(n.first().cloned())?,
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
-                    Err(e) => return Err(Error::Io(e.into())),
+                    Err(e) => return Err(Error::from(e)),
                 };
             };
 
@@ -261,7 +261,7 @@ macro_rules! impl_buffered_source {
                     Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
                     Err(e) => {
                         *position += read;
-                        return Err(Error::Io(e.into()));
+                        return Err(Error::from(e));
                     }
                 };
                 // We only parse from start because we don't want to consider

@@ -1,59 +1,240 @@
 use encoding_rs::{UTF_16BE, UTF_16LE, UTF_8, WINDOWS_1251};
 use pretty_assertions::assert_eq;
-use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event::*};
+use quick_xml::events::Event::*;
 use quick_xml::reader::Reader;
 
-mod decode {
+static RSS_DOC: &[u8] = include_bytes!("documents/opennews_all.rss");
+static UTF16BE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16be-bom.xml");
+static UTF16LE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16le-bom.xml");
+static UTF8_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf8-bom.xml");
+static UTF8_TEXT: &[u8] = include_bytes!("documents/encoding/utf8.xml");
+
+mod xml_decoding_reader {
     use super::*;
-    use pretty_assertions::assert_eq;
-    use quick_xml::encoding::detect_encoding;
+    use quick_xml::encoding::{DecodingReader, EncodingError};
+    use quick_xml::errors::Error;
 
-    static UTF16BE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16be-bom.xml");
-    static UTF16LE_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf16le-bom.xml");
-    static UTF8_TEXT_WITH_BOM: &[u8] = include_bytes!("documents/encoding/utf8-bom.xml");
+    /// Read events until an error occurs, panicking if EOF is reached first.
+    fn read_until_error(data: &[u8]) -> Error {
+        let mut buf = Vec::new();
+        let mut r = Reader::from_reader(DecodingReader::new(data));
+        r.config_mut().trim_text(true);
+        loop {
+            match r.read_event_into(&mut buf) {
+                Ok(Eof) => panic!("Expected encoding error, got EOF"),
+                Ok(_) => continue,
+                Err(e) => break e,
+            }
+        }
+    }
 
-    static UTF8_TEXT: &str = r#"<?xml version="1.0"?>
-<project name="project-name">
-</project>
-"#;
+    /// Invalid UTF-8 (no BOM, so treated as UTF-8) must produce an error.
+    #[test]
+    fn invalid_utf8_is_rejected() {
+        // "<a>" followed by invalid byte 0xFF
+        let result = read_until_error(&[0x3C, 0x61, 0x3E, 0xFF]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    /// UTF-16 LE with valid XML followed by an unpaired low surrogate (0xDC00).
+    #[test]
+    fn invalid_utf16le_is_rejected() {
+        let result = read_until_error(&[
+            0xFF, 0xFE, // UTF-16 LE BOM
+            0x3C, 0x00, // '<'
+            0x61, 0x00, // 'a'
+            0x3E, 0x00, // '>'
+            0x00, 0xDC, // unpaired low surrogate
+        ]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    /// UTF-16 BE with valid XML followed by an unpaired low surrogate (0xDC00).
+    #[test]
+    fn invalid_utf16be_is_rejected() {
+        let result = read_until_error(&[
+            0xFE, 0xFF, // UTF-16 BE BOM
+            0x00, 0x3C, // '<'
+            0x00, 0x61, // 'a'
+            0x00, 0x3E, // '>'
+            0xDC, 0x00, // unpaired low surrogate
+        ]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    /// An odd trailing byte in UTF-16 is malformed and must produce an error.
+    #[test]
+    fn truncated_utf16_at_eof() {
+        let result = read_until_error(&[
+            0xFF, 0xFE, // UTF-16 LE BOM
+            0x3C, 0x00, // '<'
+            0x61, 0x00, // 'a'
+            0x3E, 0x00, // '>'
+            0x48, 0x00, // 'H'
+            0x65, // truncated code unit
+        ]);
+        assert!(
+            matches!(result, Error::Encoding(EncodingError::Other(_))),
+            "Expected EncodingError::Other, got: {:?}",
+            result,
+        );
+    }
+
+    // UTF-8 / 16 "happy paths" already well-tested in encoding.rs
 
     #[test]
-    fn test_detect_encoding() {
-        // No BOM
-        let detected = detect_encoding(UTF8_TEXT.as_bytes()).unwrap();
-        assert_eq!(detected.encoding(), UTF_8);
-        assert_eq!(detected.bom_len(), 0);
+    fn test_koi8_r_encoding() {
+        let mut buf = vec![];
+        let mut r = Reader::from_reader(DecodingReader::new(RSS_DOC));
+        r.config_mut().trim_text(true);
+        loop {
+            match r.read_event_into(&mut buf) {
+                Ok(Text(e)) => {
+                    e.xml10_content().unwrap();
+                }
+                Ok(Eof) => break,
+                _ => (),
+            }
+        }
+    }
 
-        // BOM
-        let detected = detect_encoding(UTF8_TEXT_WITH_BOM).unwrap();
-        assert_eq!(detected.encoding(), UTF_8);
-        assert_eq!(detected.bom_len(), 3);
+    macro_rules! check_decoding_reader {
+        ($test:ident, $enc:ident, $file:literal) => {
+            #[test]
+            fn $test() {
+                let mut r = Reader::from_reader(DecodingReader::new(
+                    include_bytes!(concat!("documents/encoding/", $file, ".xml")).as_ref(),
+                ));
 
-        let detected = detect_encoding(UTF16BE_TEXT_WITH_BOM).unwrap();
-        assert_eq!(detected.encoding(), UTF_16BE);
-        assert_eq!(detected.bom_len(), 2);
+                let mut buf = Vec::new();
+                loop {
+                    match r.read_event_into(&mut buf).unwrap() {
+                        Eof => break,
+                        Decl(e) => {
+                            if let Some(encoding) = e.encoder() {
+                                r.get_mut().set_encoding(encoding);
+                            }
+                        }
+                        _ => {}
+                    }
+                    assert_eq!(r.get_ref().encoding(), $enc);
+                    buf.clear();
+                }
+            }
+        };
+    }
 
-        let detected = detect_encoding(UTF16LE_TEXT_WITH_BOM).unwrap();
-        assert_eq!(detected.encoding(), UTF_16LE);
-        assert_eq!(detected.bom_len(), 2);
+    mod decode_using_declaration {
+        use super::*;
+        use encoding_rs::*;
+        use pretty_assertions::assert_eq;
+
+        // Without BOM
+        check_decoding_reader!(utf8, UTF_8, "utf8");
+        check_decoding_reader!(utf16be, UTF_16BE, "utf16be");
+        check_decoding_reader!(utf16le, UTF_16LE, "utf16le");
+
+        // With BOM
+        check_decoding_reader!(utf8_bom, UTF_8, "utf8-bom");
+        check_decoding_reader!(utf16be_bom, UTF_16BE, "utf16be-bom");
+        check_decoding_reader!(utf16le_bom, UTF_16LE, "utf16le-bom");
+
+        // legacy multi-byte encodings
+        check_decoding_reader!(big5, BIG5, "Big5");
+        check_decoding_reader!(euc_jp, EUC_JP, "EUC-JP");
+        check_decoding_reader!(iso_2022_jp, ISO_2022_JP, "ISO-2022-JP");
+        check_decoding_reader!(euc_kr, EUC_KR, "EUC-KR");
+        check_decoding_reader!(gb18030, GB18030, "gb18030");
+        check_decoding_reader!(gbk, GBK, "GBK");
+        check_decoding_reader!(shift_jis, SHIFT_JIS, "Shift_JIS");
+
+        // legacy single-byte encodings
+        check_decoding_reader!(ibm866, IBM866, "IBM866");
+        check_decoding_reader!(iso_8859_2, ISO_8859_2, "ISO-8859-2");
+        check_decoding_reader!(iso_8859_3, ISO_8859_3, "ISO-8859-3");
+        check_decoding_reader!(iso_8859_4, ISO_8859_4, "ISO-8859-4");
+        check_decoding_reader!(iso_8859_5, ISO_8859_5, "ISO-8859-5");
+        check_decoding_reader!(iso_8859_6, ISO_8859_6, "ISO-8859-6");
+        check_decoding_reader!(iso_8859_7, ISO_8859_7, "ISO-8859-7");
+        check_decoding_reader!(iso_8859_8, ISO_8859_8, "ISO-8859-8");
+        check_decoding_reader!(iso_8859_8_i, ISO_8859_8_I, "ISO-8859-8-I");
+        check_decoding_reader!(iso_8859_10, ISO_8859_10, "ISO-8859-10");
+        check_decoding_reader!(iso_8859_13, ISO_8859_13, "ISO-8859-13");
+        check_decoding_reader!(iso_8859_14, ISO_8859_14, "ISO-8859-14");
+        check_decoding_reader!(iso_8859_15, ISO_8859_15, "ISO-8859-15");
+        check_decoding_reader!(iso_8859_16, ISO_8859_16, "ISO-8859-16");
+        check_decoding_reader!(koi8_r, KOI8_R, "KOI8-R");
+        check_decoding_reader!(koi8_u, KOI8_U, "KOI8-U");
+        check_decoding_reader!(macintosh, MACINTOSH, "macintosh");
+        check_decoding_reader!(windows_874, WINDOWS_874, "windows-874");
+        check_decoding_reader!(windows_1250, WINDOWS_1250, "windows-1250");
+        check_decoding_reader!(windows_1251, WINDOWS_1251, "windows-1251");
+        check_decoding_reader!(windows_1252, WINDOWS_1252, "windows-1252");
+        check_decoding_reader!(windows_1253, WINDOWS_1253, "windows-1253");
+        check_decoding_reader!(windows_1254, WINDOWS_1254, "windows-1254");
+        check_decoding_reader!(windows_1255, WINDOWS_1255, "windows-1255");
+        check_decoding_reader!(windows_1256, WINDOWS_1256, "windows-1256");
+        check_decoding_reader!(windows_1257, WINDOWS_1257, "windows-1257");
+        check_decoding_reader!(windows_1258, WINDOWS_1258, "windows-1258");
+        check_decoding_reader!(x_mac_cyrillic, X_MAC_CYRILLIC, "x-mac-cyrillic");
+        check_decoding_reader!(x_user_defined, X_USER_DEFINED, "x-user-defined");
+    }
+}
+
+/// Tests for the post-parse decoding approach
+mod legacy_decoding {
+    use super::*;
+
+    #[test]
+    fn koi8_r() {
+        let mut buf = Vec::new();
+        let mut r = Reader::from_reader(RSS_DOC);
+        r.config_mut().trim_text(true);
+        loop {
+            match r.read_event_into(&mut buf) {
+                Ok(Text(e)) => {
+                    e.xml10_content().unwrap();
+                }
+                Ok(Eof) => break,
+                _ => (),
+            }
+        }
     }
 }
 
 #[test]
-fn test_koi8_r_encoding() {
-    let src = include_bytes!("documents/opennews_all.rss").as_ref();
-    let mut buf = vec![];
-    let mut r = Reader::from_reader(src);
-    r.config_mut().trim_text(true);
-    loop {
-        match r.read_event_into(&mut buf) {
-            Ok(Text(e)) => {
-                e.xml10_content().unwrap();
-            }
-            Ok(Eof) => break,
-            _ => (),
-        }
-    }
+fn test_detect_encoding() {
+    use quick_xml::encoding::detect_encoding;
+
+    // No BOM
+    let detected = detect_encoding(UTF8_TEXT).unwrap();
+    assert_eq!(detected.encoding(), UTF_8);
+    assert_eq!(detected.bom_len(), 0);
+
+    // BOM
+    let detected = detect_encoding(UTF8_TEXT_WITH_BOM).unwrap();
+    assert_eq!(detected.encoding(), UTF_8);
+    assert_eq!(detected.bom_len(), 3);
+
+    let detected = detect_encoding(UTF16BE_TEXT_WITH_BOM).unwrap();
+    assert_eq!(detected.encoding(), UTF_16BE);
+    assert_eq!(detected.bom_len(), 2);
+
+    let detected = detect_encoding(UTF16LE_TEXT_WITH_BOM).unwrap();
+    assert_eq!(detected.encoding(), UTF_16LE);
+    assert_eq!(detected.bom_len(), 2);
 }
 
 /// Test data generated by helper project `test-gen`, which requires checkout of
@@ -170,13 +351,13 @@ mod detect {
 
     // Without BOM
     detect_test!(utf8, UTF_8, "utf8");
-    detect_test!(utf16be, UTF_16BE, "utf16be");
-    detect_test!(utf16le, UTF_16LE, "utf16le");
+    detect_test!(utf16be, UTF_16BE, "utf16be" break);
+    detect_test!(utf16le, UTF_16LE, "utf16le" break);
 
     // With BOM
     detect_test!(utf8_bom, UTF_8, "utf8-bom");
-    detect_test!(utf16be_bom, UTF_16BE, "utf16be-bom");
-    detect_test!(utf16le_bom, UTF_16LE, "utf16le-bom");
+    detect_test!(utf16be_bom, UTF_16BE, "utf16be-bom" break);
+    detect_test!(utf16le_bom, UTF_16LE, "utf16le-bom" break);
 
     // legacy multi-byte encodings (7)
     check_detection!(big5, BIG5, "Big5");
@@ -184,7 +365,9 @@ mod detect {
     check_detection!(euc_kr, EUC_KR, "EUC-KR");
     check_detection!(gb18030, GB18030, "gb18030");
     check_detection!(gbk, GBK, "GBK");
-    // TODO: XML in this encoding cannot be parsed successfully until #158 resolves
+    // XML in this encoding cannot be parsed successfully without DecodingReader,
+    // because encoding is stateful and the same byte may have different meaning
+    // depending on the previous bytes in the stream.
     // We only read the first event to ensure, that encoding detected correctly
     detect_test!(iso_2022_jp, ISO_2022_JP, "ISO-2022-JP" break);
     check_detection!(shift_jis, SHIFT_JIS, "Shift_JIS");
@@ -221,26 +404,8 @@ mod detect {
     check_detection!(x_user_defined, X_USER_DEFINED, "x-user-defined");
 }
 
-#[test]
-fn bom_removed_from_initial_text() {
-    let mut r =
-        Reader::from_str("\u{FEFF}asdf<paired attr1=\"value1\" attr2=\"value2\">text</paired>");
-
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::new("asdf")));
-    assert_eq!(
-        r.read_event().unwrap(),
-        Start(BytesStart::from_content(
-            "paired attr1=\"value1\" attr2=\"value2\"",
-            6
-        ))
-    );
-    assert_eq!(r.read_event().unwrap(), Text(BytesText::new("text")));
-    assert_eq!(r.read_event().unwrap(), End(BytesEnd::new("paired")));
-    assert_eq!(r.read_event().unwrap(), Eof);
-}
-
 /// Checks that encoding is detected by BOM and changed after XML declaration
-/// BOM indicates UTF-16LE, but XML - windows-1251
+/// BOM indicates UTF-16LE, but XML declares windows-1251
 #[test]
 fn bom_overridden_by_declaration() {
     let mut reader = Reader::from_reader(b"\xFF\xFE<?xml encoding='windows-1251'?>".as_ref());

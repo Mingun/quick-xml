@@ -1,3 +1,147 @@
 <?xml version="1.0"?>
-<project name="project-name">
-</project>
+<library>
+  <!-- English: ASCII-only baseline (1-byte UTF-8 characters) -->
+  <section lang="en" name="English Books">
+    <book id="bk101" rating="4.5" added="2023-06-15">
+      <author>Tolkien, J.R.R.</author>
+      <title>The Lord of the Rings</title>
+      <genre>Fantasy</genre>
+      <price currency="USD">29.99</price>
+      <publish_date>1954-07-29</publish_date>
+      <description>An epic high-fantasy novel about the quest
+          to destroy the One Ring and defeat the Dark Lord Sauron.</description>
+    </book>
+  </section>
+  <!-- Japanese: 3-byte CJK ideographs and katakana/hiragana -->
+  <section lang="ja" name="日本語書籍">
+    <book id="bk201" rating="4.5" added="2023-06-15">
+      <author>村上 春樹</author>
+      <title>ノルウェイの森</title>
+      <genre>小説</genre>
+      <price currency="JPY">1760</price>
+      <publish_date>1987-09-04</publish_date>
+      <description>東京の大学生ワタナベが、親友キズキの死後、
+          その恋人の直子との関係に苦しむ物語。</description>
+    </book>
+    <book id="bk202" rating="4.8" added="2023-07-22">
+      <author>夏目 漱石</author>
+      <title>吾輩は猫である</title>
+      <genre>風刺</genre>
+      <price currency="JPY">572</price>
+      <publish_date>1905-01-01</publish_date>
+      <description>名前のない猫の視点から、明治時代の
+          日本社会を風刺的に描いた作品。</description>
+    </book>
+  </section>
+  <!-- Chinese: 3-byte CJK ideographs, mix of simplified and traditional -->
+  <section lang="zh" name="中文书籍">
+    <book id="bk301" rating="4.7" added="2024-01-10">
+      <author>鲁迅</author>
+      <title>阿Q正传</title>
+      <genre>中篇小说</genre>
+      <price currency="CNY">28.50</price>
+      <publish_date>1921-12-04</publish_date>
+      <description>讲述了一个贫穷的日工阿Q的故事，
+          他以"精神胜利法"自我安慰。</description>
+    </book>
+    <book id="bk302" rating="4.3" added="2024-02-28">
+      <author>曹雪芹</author>
+      <title>紅樓夢</title>
+      <genre>古典小說</genre>
+      <price currency="CNY">98.00</price>
+      <publish_date>1791-01-01</publish_date>
+      <description>賈寶玉與林黛玉、薛寶釵之間的愛情故事，
+          描繪了一個貴族家庭的興衰。</description>
+    </book>
+  </section>
+  <!-- Korean: 3-byte Hangul syllables -->
+  <section lang="ko" name="한국어 도서">
+    <book id="bk401" rating="4.6" added="2023-11-05">
+      <author>한강</author>
+      <title>채식주의자</title>
+      <genre>소설</genre>
+      <price currency="KRW">13000</price>
+      <publish_date>2007-10-30</publish_date>
+      <description>평범한 주부 영혜가 어느 날 갑자기
+          육식을 거부하면서 벌어지는 이야기.</description>
+    </book>
+  </section>
+  <!-- Arabic: 2-byte characters, right-to-left script -->
+  <section lang="ar" name="كتب عربية">
+    <book id="bk501" rating="4.9" added="2024-03-17" pages="352">
+      <author>نجيب محفوظ</author>
+      <title>أولاد حارتنا</title>
+      <genre>رواية</genre>
+      <price currency="EGP">150.00</price>
+      <publish_date>1959-01-01</publish_date>
+      <description>رواية رمزية تتناول تاريخ البشرية من خلال
+          حكاية حارة شعبية في القاهرة.</description>
+    </book>
+  </section>
+  <!-- Hindi: 3-byte Devanagari script -->
+  <section lang="hi" name="हिन्दी पुस्तकें">
+    <book id="bk601" rating="4.4" added="2023-09-30" pages="216">
+      <author>मुंशी प्रेमचंद</author>
+      <title>गोदान</title>
+      <genre>उपन्यास</genre>
+      <price currency="INR">299.00</price>
+      <publish_date>1936-06-01</publish_date>
+      <description>किसान होरी की कहानी, जो एक गाय खरीदने
+          के सपने में अपना पूरा जीवन लगा देता है।</description>
+    </book>
+  </section>
+  <!-- Russian: 2-byte Cyrillic characters -->
+  <section lang="ru" name="Русские книги">
+    <book id="bk701" rating="4.7" added="2024-04-12" pages="1225">
+      <author>Лев Толстой</author>
+      <title>Война и мир</title>
+      <genre>Роман</genre>
+      <price currency="RUB">890.00</price>
+      <publish_date>1869-01-01</publish_date>
+      <description>Эпический роман о жизни русского общества
+          в эпоху наполеоновских войн.</description>
+    </book>
+    <book id="bk702" rating="4.6" added="2024-05-01" pages="551">
+      <author>Фёдор Достоевский</author>
+      <title>Преступление и наказание</title>
+      <genre>Роман</genre>
+      <price currency="RUB">650.00</price>
+      <publish_date>1866-01-01</publish_date>
+      <description>Бедный студент Раскольников совершает убийство
+          и переживает нравственные муки.</description>
+    </book>
+  </section>
+  <!-- Greek: 2-byte Greek characters -->
+  <section lang="el" name="Ελληνικά βιβλία">
+    <book id="bk801" rating="4.2" added="2023-12-20" pages="48">
+      <author>Κωνσταντίνος Καβάφης</author>
+      <title>Ποιήματα</title>
+      <genre>Ποίηση</genre>
+      <price currency="EUR">12.50</price>
+      <publish_date>1935-01-01</publish_date>
+      <description>Συλλογή ποιημάτων που εξερευνούν τον ελληνισμό,
+          τον έρωτα και τη φθορά του χρόνου.</description>
+    </book>
+  </section>
+  <!-- Emoji: 4-byte characters (U+1Fxxx), including flag sequences and ZWJ sequences -->
+  <section lang="mixed" name="Reviews">
+    <review book-ref="bk201" user="読書好き📚" score="5" date="2024-08-15">
+      <comment>素晴らしい作品！何度読んでも感動します 😭✨</comment>
+    </review>
+    <review book-ref="bk301" user="书虫🐛" score="4" date="2024-09-03">
+      <comment>鲁迅的讽刺至今仍然尖锐 🔥👏</comment>
+    </review>
+    <review book-ref="bk701" user="Книголюб" score="5" date="2024-10-21">
+      <comment>Величайший роман всех времён 🏆📖</comment>
+    </review>
+    <review book-ref="bk401" user="독서광🌿" score="4" date="2024-11-11">
+      <comment>강렬하고 아름다운 소설 🌱💚</comment>
+    </review>
+    <review book-ref="bk501" user="قارئ📕" score="5" date="2024-12-01">
+      <comment>رواية عظيمة تستحق القراءة 🌟🙌</comment>
+    </review>
+    <review book-ref="bk601" user="पाठक" score="4" date="2025-01-14">
+      <comment>प्रेमचंद की सर्वश्रेष्ठ कृति 🙏📕</comment>
+    </review>
+  </section>
+</library>

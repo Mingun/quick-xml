@@ -34,6 +34,8 @@ pub struct Attribute<'a> {
 impl<'a> Attribute<'a> {
     /// Returns the attribute value normalized as per [the XML specification] (or [for 1.0]).
     ///
+    /// The document **must** be UTF-8 encoded, or pre-processed using [`DecodingReader`].
+    ///
     /// The characters `\t`, `\r`, `\n` are replaced with whitespace characters (`0x20`).
     ///
     /// The following escape sequences are replaced with their unescaped equivalents:
@@ -67,20 +69,16 @@ impl<'a> Attribute<'a> {
     ///
     /// <div style="background:rgba(120,145,255,0.45);padding:0.75em;">
     ///
-    /// NOTE: Because this method is available only if [`encoding`] feature is **not** enabled,
-    /// should only be used by applications.
-    /// Libs should use [`decoded_and_normalized_value()`](Self::decoded_and_normalized_value)
-    /// instead, because if lib will be used in a project which depends on quick_xml with
-    /// [`encoding`] feature enabled, the lib will fail to compile due to [feature unification].
+    /// NOTE: If you are using this in a context where the input is not controlled,
+    /// it is preferred to wrap the input stream in [`DecodingReader`] or to use
+    /// [`decoded_and_normalized_value()`](Self::decoded_and_normalized_value) instead.
     ///
     /// </div>
     ///
     /// [the XML specification]: https://www.w3.org/TR/xml11/#AVNormalize
+    /// [`DecodingReader`]: ../../encoding/struct.DecodingReader.html
     /// [for 1.0]: https://www.w3.org/TR/xml/#AVNormalize
     /// [only for]: https://html.spec.whatwg.org/#normalize-newlines
-    /// [`encoding`]: ../../index.html#encoding
-    /// [feature unification]: https://doc.rust-lang.org/cargo/reference/features.html#feature-unification
-    #[cfg(any(doc, not(feature = "encoding")))]
     pub fn normalized_value(&self, version: XmlVersion) -> XmlResult<Cow<'a, str>> {
         // resolve_predefined_entity returns only non-recursive replacements, so depth=1 is enough
         self.normalized_value_with(version, 1, resolve_predefined_entity)
@@ -88,6 +86,8 @@ impl<'a> Attribute<'a> {
 
     /// Returns the attribute value normalized as per [the XML specification] (or [for 1.0]),
     /// using a custom entity resolver.
+    ///
+    /// The document **must** be UTF-8 encoded, or pre-processed using [`DecodingReader`].
     ///
     /// Do not use this method with HTML attributes.
     ///
@@ -118,11 +118,9 @@ impl<'a> Attribute<'a> {
     ///
     /// <div style="background:rgba(120,145,255,0.45);padding:0.75em;">
     ///
-    /// NOTE: Because this method is available only if [`encoding`] feature is **not** enabled,
-    /// should only be used by applications.
-    /// Libs should use [`decoded_and_normalized_value_with()`](Self::decoded_and_normalized_value_with)
-    /// instead, because if lib will be used in a project which depends on quick_xml with
-    /// [`encoding`] feature enabled, the lib will fail to compile due to [feature unification].
+    /// NOTE: If you are using this in a context where the input is not controlled,
+    /// it is preferred to wrap the input stream in [`DecodingReader`] or to use
+    /// [`decoded_and_normalized_value_with()`](Self::decoded_and_normalized_value_with) instead.
     ///
     /// </div>
     ///
@@ -135,12 +133,10 @@ impl<'a> Attribute<'a> {
     ///   for the same input, although it is not recommended
     ///
     /// [the XML specification]: https://www.w3.org/TR/xml11/#AVNormalize
+    /// [`DecodingReader`]: ../../encoding/struct.DecodingReader.html
     /// [for 1.0]: https://www.w3.org/TR/xml/#AVNormalize
     /// [only for]: https://html.spec.whatwg.org/#normalize-newlines
-    /// [`encoding`]: ../../index.html#encoding
-    /// [feature unification]: https://doc.rust-lang.org/cargo/reference/features.html#feature-unification
     /// [`EscapeError::TooManyNestedEntities`]: crate::escape::EscapeError::TooManyNestedEntities
-    #[cfg(any(doc, not(feature = "encoding")))]
     pub fn normalized_value_with<'entity>(
         &self,
         version: XmlVersion,
