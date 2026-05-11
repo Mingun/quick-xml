@@ -52,6 +52,7 @@
 // docs.rs defines `docsrs` when building documentation
 // Since 1.92 `doc_auto_cfg` was merged into `doc_cfg`
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![warn(clippy::missing_const_for_fn)]
 
 #[cfg(feature = "serialize")]
 pub mod de;

@@ -453,11 +453,15 @@ impl NamespaceBinding {
     /// Get the namespace prefix, bound to this namespace declaration, or `None`,
     /// if this declaration is for default namespace (`xmlns="..."`).
     #[inline]
-    fn prefix<'b>(&self, ns_buffer: &'b [u8]) -> Option<Prefix<'b>> {
+    const fn prefix<'b>(&self, buffer: &'b [u8]) -> Option<Prefix<'b>> {
         if self.prefix_len == 0 {
             None
         } else {
-            Some(Prefix(&ns_buffer[self.start..self.start + self.prefix_len]))
+            // We use split_at to get [start..start + prefix_len]
+            // in a constant way
+            let (_, prefix) = buffer.split_at(self.start);
+            let (prefix, _) = prefix.split_at(self.prefix_len);
+            Some(Prefix(prefix))
         }
     }
 
@@ -466,12 +470,15 @@ impl NamespaceBinding {
     /// Returns `None` if namespace for this prefix was explicitly removed from
     /// scope, using `xmlns[:prefix]=""`
     #[inline]
-    fn namespace<'ns>(&self, buffer: &'ns [u8]) -> ResolveResult<'ns> {
+    const fn namespace<'ns>(&self, buffer: &'ns [u8]) -> ResolveResult<'ns> {
         if self.value_len == 0 {
             ResolveResult::Unbound
         } else {
-            let start = self.start + self.prefix_len;
-            ResolveResult::Bound(Namespace(&buffer[start..start + self.value_len]))
+            // We use split_at to get [start + prefix_len..start + prefix_len + value_len]
+            // in a constant way
+            let (_, ns) = buffer.split_at(self.start + self.prefix_len);
+            let (ns, _) = ns.split_at(self.value_len);
+            ResolveResult::Bound(Namespace(ns))
         }
     }
 }

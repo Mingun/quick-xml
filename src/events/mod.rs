@@ -816,7 +816,7 @@ impl<'a> BytesCData<'a> {
     /// ]);
     /// ```
     #[inline]
-    pub fn escaped(content: &'a str) -> CDataIterator<'a> {
+    pub const fn escaped(content: &'a str) -> CDataIterator<'a> {
         CDataIterator {
             inner: utils::CDataIterator::new(content),
         }
@@ -1698,8 +1698,6 @@ impl<'a> BytesRef<'a> {
     pub fn xml11_content(&self) -> Result<Cow<'a, str>, EncodingError> {
         self.decoder.content(&self.content, normalize_xml11_eols)
     }
-
-    /// Alias for [`xml11_content()`](Self::xml11_content).
 
     /// Decodes the content of the XML event according to the specified version.
     ///

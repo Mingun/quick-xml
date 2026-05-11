@@ -781,8 +781,7 @@ where
             let pat = &input[start..end];
             // 1. For a character reference, append the referenced character
             //    to the normalized value.
-            if pat.starts_with('#') {
-                let entity = &pat[1..]; // starts after the #
+            if let Some(entity) = pat.strip_prefix('#') {
                 let codepoint = parse_number(entity).map_err(EscapeError::InvalidCharRef)?;
                 normalized.push_str(codepoint.encode_utf8(&mut [0u8; 4]));
             } else
