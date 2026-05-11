@@ -1699,8 +1699,6 @@ impl<'a> BytesRef<'a> {
         self.decoder.content(&self.content, normalize_xml11_eols)
     }
 
-    /// Alias for [`xml11_content()`](Self::xml11_content).
-
     /// Decodes the content of the XML event according to the specified version.
     ///
     /// When this event produced by the reader, it uses the encoding information
