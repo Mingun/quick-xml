@@ -14,6 +14,15 @@
 
 ## Unreleased
 
+### New Features
+
+### Bug Fixes
+
+### Misc Changes
+
+
+## 0.40.0 -- 2026-05-11
+
 MSRV bumped to 1.79.
 
 Now `quick-xml` supports the UTF-16 encoded documents. See the new `DecodingReader` type.
