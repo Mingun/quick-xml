@@ -18,6 +18,16 @@
 
 ### Bug Fixes
 
+- Fix `unreachable!()` panic in the serde deserializer when a DOCTYPE
+  declaration appears between two text runs inside an element (e.g.
+  `<a>x<!DOCTYPE y>z</a>`). The DOCTYPE used to break `drain_text`'s
+  consecutive-text merge, so two `DeEvent::Text` events reached
+  `read_text` and tripped its "Cannot be two consequent Text events"
+  invariant. DOCTYPE is now treated as transparent during text drain —
+  it still goes through the entity resolver, but the surrounding text
+  is merged into one run. Discovered via libFuzzer on a real-world
+  SAML deserializer harness.
+
 ### Misc Changes
 
 
