@@ -18,7 +18,14 @@
 
 ### Bug Fixes
 
-- Fix `unreachable!()` panic in the serde deserializer when a DOCTYPE
+### Misc Changes
+
+
+## 0.40.1 -- 2026-05-15
+
+### Bug Fixes
+
+- [#964]: Fix `unreachable!()` panic in the serde deserializer when a DOCTYPE
   declaration appears between two text runs inside an element (e.g.
   `<a>x<!DOCTYPE y>z</a>`). The DOCTYPE used to break `drain_text`'s
   consecutive-text merge, so two `DeEvent::Text` events reached
@@ -27,6 +34,8 @@
   it still goes through the entity resolver, but the surrounding text
   is merged into one run. Discovered via libFuzzer on a real-world
   SAML deserializer harness.
+
+[#964]: https://github.com/tafia/quick-xml/pull/964
 
 ### Misc Changes
 
