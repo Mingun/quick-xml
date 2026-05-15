@@ -2372,16 +2372,30 @@ impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
     /// Returns `true` when next event is not a text event in any form.
     #[inline(always)]
     const fn current_event_is_last_text(&self) -> bool {
-        // If next event is a text or CDATA, we should not trim trailing spaces
+        // If next event is a text-like event or a DocType (which is
+        // metadata and invisible to the data model), we should not
+        // trim trailing spaces — there is more content to drain, and
+        // any DocType between us and the next text run needs to be
+        // absorbed so `read_text` does not later see two consecutive
+        // `DeEvent::Text`. Without DocType here, an input like
+        // `<a>x<!DOCTYPE y>z</a>` produces two text events for `x`
+        // and `z`, tripping `unreachable!()` in `read_text`.
         !matches!(
             self.lookahead,
-            Ok(PayloadEvent::Text(_)) | Ok(PayloadEvent::CData(_) | PayloadEvent::GeneralRef(_))
+            Ok(PayloadEvent::Text(_)
+                | PayloadEvent::CData(_)
+                | PayloadEvent::GeneralRef(_)
+                | PayloadEvent::DocType(_))
         )
     }
 
     /// Read all consequent [`Text`] and [`CData`] events until non-text event
     /// occurs. Content of all events would be appended to `result` and returned
     /// as [`DeEvent::Text`].
+    ///
+    /// DocType events that fall between text events are absorbed by the
+    /// entity resolver and do not break the run — see
+    /// [`Self::current_event_is_last_text`] for the rationale.
     ///
     /// [`Text`]: PayloadEvent::Text
     /// [`CData`]: PayloadEvent::CData
@@ -2399,9 +2413,16 @@ impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
                     .to_mut()
                     .push_str(&e.xml_content(self.reader.xml_version())?),
                 PayloadEvent::GeneralRef(e) => self.resolve_reference(result.to_mut(), e)?,
+                PayloadEvent::DocType(e) => {
+                    self.entity_resolver
+                        .capture(e)
+                        .map_err(|err| DeError::Custom(format!("cannot parse DTD: {}", err)))?;
+                }
 
-                // SAFETY: current_event_is_last_text checks that event is Text, CData or GeneralRef
-                _ => unreachable!("Only `Text`, `CData` or `GeneralRef` events can come here"),
+                // SAFETY: current_event_is_last_text checks that event is Text, CData, GeneralRef, or DocType
+                _ => unreachable!(
+                    "Only `Text`, `CData`, `GeneralRef` or `DocType` events can come here"
+                ),
             }
         }
         Ok(DeEvent::Text(Text::new(result)))
